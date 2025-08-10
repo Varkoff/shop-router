@@ -1,89 +1,50 @@
-import { getFormProps, getInputProps, useForm } from "@conform-to/react";
-import { getZodConstraint, parseWithZod } from "@conform-to/zod";
-import {
-  type ActionFunctionArgs,
-  data,
-  Form,
-  useActionData,
-} from "react-router";
-import { z } from "zod";
-import { Field } from "~/components/forms";
-import { Button } from "~/components/ui/button";
+import { useLoaderData } from "react-router";
+import { prisma } from "~/server/db.server";
 
-const LoginSchema = z.object({
-  email: z.string().email({
-    message: "Email invalide",
-  }),
-});
 
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const submission = parseWithZod(formData, {
-    schema: LoginSchema.superRefine((data, ctx) => {
-      if (data.email !== "virgile@algomax.fr") {
-        ctx.addIssue({
-          message:
-            "L'email n'est pas correct: vous ne faites pas partie d'Algomax",
-          path: ["email"],
-          code: "custom",
-        });
-      }
-    }),
-  });
-
-  if (submission.status !== "success") {
-    return data(
-      {
-        result: submission.reply(),
-      },
-      {
-        status: 400,
-      },
-    );
-  }
-  return data({
-    result: submission.reply(),
-  });
+export async function loader() {
+  return await prisma.product.findMany({
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      price: true,
+    }
+  })
 }
 
 export default function Home() {
-  const actionData = useActionData<typeof action>();
-  const [form, fields] = useForm({
-    constraint: getZodConstraint(LoginSchema),
-    onValidate({ formData }) {
-      return parseWithZod(formData, {
-        schema: LoginSchema,
-      });
-    },
-    lastResult: actionData?.result,
-  });
+  const products = useLoaderData<typeof loader>();
+
   return (
     <main className="flex items-center justify-center pt-16 pb-4">
       <div className="flex-1 flex flex-col items-center gap-16 min-h-0">
         <header className="flex flex-col items-center gap-9">
           <h1 className="text-4xl font-bold text-sky-600">
-            Bienvenue sur Shop Router
+            Shop Router
           </h1>
         </header>
-        <Form
-          {...getFormProps(form)}
-          className="max-w-[300px] w-full space-y-6 px-4"
-          method="POST"
-        >
-          <Field
-            inputProps={{
-              ...getInputProps(fields.email, {
-                type: "email",
-              }),
-            }}
-            labelProps={{ children: "Email" }}
-            errors={fields.email.errors}
-          />
-          <Button variant="default" type="submit">
-            Bienvenue sur Shop Router
-          </Button>
-        </Form>
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {products.map((product) => (
+            <div key={product.id}>
+              <h2>{product.name}</h2>
+              <p>{product.description}</p>
+              <p>{product.price.d} €</p>
+            </div>
+          ))}
+        </section>
+
       </div>
     </main>
   );
+}
+
+function ProductCard({ product }: { product: any }) {
+  return (
+    <div>
+      <h2>{product.name}</h2>
+      <p>{product.description}</p>
+      <p>{Number(product.price).toFixed(2)} €</p>
+    </div>
+  )
 }
