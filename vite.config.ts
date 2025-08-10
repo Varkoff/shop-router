@@ -4,5 +4,13 @@ import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
+	optimizeDeps: {
+		exclude: [
+			// "@prisma/client",
+			// ".prisma/client",
+			".prisma/client/default",
+			".prisma/client/index-browser",
+		],
+	},
+	plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
 });
