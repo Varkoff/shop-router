@@ -1,16 +1,9 @@
 import { useLoaderData } from "react-router";
-import { prisma } from "~/server/db.server";
+import { getProducts } from "~/server/products.server";
 
 
 export async function loader() {
-  return await prisma.product.findMany({
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      price: true,
-    }
-  })
+  return await getProducts()
 }
 
 export default function Home() {
@@ -26,11 +19,7 @@ export default function Home() {
         </header>
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {products.map((product) => (
-            <div key={product.id}>
-              <h2>{product.name}</h2>
-              <p>{product.description}</p>
-              <p>{product.price.d} €</p>
-            </div>
+            <ProductCard key={product.id} product={product} />
           ))}
         </section>
 
@@ -39,12 +28,12 @@ export default function Home() {
   );
 }
 
-function ProductCard({ product }: { product: any }) {
+function ProductCard({ product }: { product: Awaited<ReturnType<typeof getProducts>>[number] }) {
   return (
-    <div>
+    <div key={product.id}>
       <h2>{product.name}</h2>
       <p>{product.description}</p>
-      <p>{Number(product.price).toFixed(2)} €</p>
+      <p>{product.priceCents / 100} €</p>
     </div>
   )
 }

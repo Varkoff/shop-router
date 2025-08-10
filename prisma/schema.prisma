@@ -80,7 +80,7 @@ model Product {
   description     String?
   currency        String     @default("EUR")
   // Price is stored to render UI; Stripe price is authoritative for billing
-  price           Decimal    @db.Decimal(10, 2)
+  priceCents      Int        @default(0)
   stock           Int        @default(0)
   isActive        Boolean    @default(true)
   stripeProductId String?    @unique
@@ -113,14 +113,14 @@ model Cart {
 }
 
 model CartItem {
-  id        String   @id @default(uuid())
-  cart      Cart     @relation(fields: [cartId], references: [id])
-  cartId    String
-  product   Product  @relation(fields: [productId], references: [id])
-  productId String
-  quantity  Int      @default(1)
-  unitPrice Decimal  @db.Decimal(10, 2)
-  createdAt DateTime @default(now())
+  id             String   @id @default(uuid())
+  cart           Cart     @relation(fields: [cartId], references: [id])
+  cartId         String
+  product        Product  @relation(fields: [productId], references: [id])
+  productId      String
+  quantity       Int      @default(1)
+  unitPriceCents Int
+  createdAt      DateTime @default(now())
 }
 
 model Order {
@@ -134,10 +134,10 @@ model Order {
 
   items OrderItem[]
 
-  subtotal Decimal @db.Decimal(10, 2)
-  tax      Decimal @default("0.00") @db.Decimal(10, 2)
-  shipping Decimal @default("0.00") @db.Decimal(10, 2)
-  total    Decimal @db.Decimal(10, 2)
+  subtotalCents Int
+  taxCents      Int @default(0)
+  shippingCents Int @default(0)
+  totalCents    Int
 
   orderStatus    OrderStatus    @default(PENDING)
   paymentStatus  PaymentStatus  @default(PENDING)
@@ -159,15 +159,15 @@ model Order {
 }
 
 model OrderItem {
-  id            String  @id @default(uuid())
-  order         Order   @relation(fields: [orderId], references: [id])
-  orderId       String
-  productId     String?
-  productName   String
-  quantity      Int     @default(1)
-  unitPrice     Decimal @db.Decimal(10, 2)
-  totalPrice    Decimal @db.Decimal(10, 2)
-  stripePriceId String?
+  id              String  @id @default(uuid())
+  order           Order   @relation(fields: [orderId], references: [id])
+  orderId         String
+  productId       String?
+  productName     String
+  quantity        Int     @default(1)
+  unitPriceCents  Int
+  totalPriceCents Int
+  stripePriceId   String?
 }
 
 model Invoice {
@@ -175,7 +175,7 @@ model Invoice {
   order           Order     @relation(fields: [orderId], references: [id])
   orderId         String    @unique
   stripeInvoiceId String    @unique
-  amount          Decimal   @db.Decimal(10, 2)
+  amountCents     Int
   paidAt          DateTime?
   createdAt       DateTime  @default(now())
 }

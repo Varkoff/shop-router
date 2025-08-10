@@ -75,7 +75,9 @@ export async function main() {
 				name,
 				slug,
 				description: `Produit généré: ${name}`,
-				price: priceStr,
+				// price: priceStr,
+				// price
+				priceCents: Number(priceStr) * 100,
 				stock,
 				isActive: true,
 				currency: "EUR",
