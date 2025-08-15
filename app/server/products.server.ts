@@ -7,6 +7,7 @@ export async function getProducts() {
 			name: true,
 			description: true,
 			priceCents: true,
+			slug: true,
 		},
 	});
 
@@ -15,4 +16,64 @@ export async function getProducts() {
 		...p,
 		imageUrl: `https://picsum.photos/seed/${encodeURIComponent(String(p.id))}/600/400`,
 	}));
+}
+
+export async function getProduct({ productSlug }: { productSlug: string }) {
+	const product = await prisma.product.findUnique({
+		where: {
+			slug: productSlug,
+		},
+		select: {
+			id: true,
+			name: true,
+			description: true,
+			priceCents: true,
+			slug: true,
+			content: true,
+			stock: true,
+			images: true,
+			updatedAt: true,
+			createdAt: true,
+			currency: true,
+			categories: true,
+			isActive: true,
+		},
+	});
+
+	let productImages: {
+		id: string;
+		url: string;
+		alt: string;
+	}[] = [];
+
+	if (product) {
+		productImages =
+			product?.images.length > 0
+				? product?.images.map((image) => ({
+						id: image.id,
+						url: image.url,
+						alt: image.alt || product.name,
+					}))
+				: [
+						{
+							id: "placeholder-1",
+							url: `https://picsum.photos/seed/${encodeURIComponent(String(product.id))}/800/600`,
+							alt: product.name,
+						},
+						{
+							id: "placeholder-2",
+							url: `https://picsum.photos/seed/${encodeURIComponent(String(product.id))}-2/800/600`,
+							alt: `${product.name} - Vue 2`,
+						},
+						{
+							id: "placeholder-3",
+							url: `https://picsum.photos/seed/${encodeURIComponent(String(product.id))}-3/800/600`,
+							alt: `${product.name} - Vue 3`,
+						},
+					];
+	}
+
+	const markdown = product?.content;
+
+	return { product, productImages };
 }
