@@ -78,6 +78,7 @@ model Product {
   name            String
   slug            String     @unique
   description     String?
+  content         String?
   currency        String     @default("EUR")
   // Price is stored to render UI; Stripe price is authoritative for billing
   priceCents      Int        @default(0)

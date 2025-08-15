@@ -33,7 +33,7 @@ export const ProductCard = ({
 
             {/* Link clickable sur toute la card */}
             <Link
-                to={`/products/${product.id}`}
+                to={`/products/${product.slug}`}
                 className="absolute inset-0 z-10"
                 aria-label={`Voir les détails de ${product.name}`}
             />
