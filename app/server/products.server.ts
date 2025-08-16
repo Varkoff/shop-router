@@ -1,3 +1,5 @@
+import type { z } from "zod";
+import type { ProductSchema } from "~/routes/admin+/products.$productSlug";
 import { prisma } from "./db.server";
 
 export async function getProducts() {
@@ -8,13 +10,32 @@ export async function getProducts() {
 			description: true,
 			priceCents: true,
 			slug: true,
+			stock: true,
+			isActive: true,
+			images: {
+				select: {
+					id: true,
+					url: true,
+					alt: true,
+				},
+				take: 1,
+			},
+		},
+		where: {
+			isActive: true,
+		},
+		orderBy: {
+			id: "asc",
 		},
 	});
 
 	// attach a placeholder image URL for each product using picsum (stable per id)
 	return products.map((p) => ({
 		...p,
-		imageUrl: `https://picsum.photos/seed/${encodeURIComponent(String(p.id))}/600/400`,
+		imageUrl:
+			p.images.length > 0
+				? p.images[0].url
+				: `https://picsum.photos/seed/${encodeURIComponent(String(p.id))}/600/400`,
 	}));
 }
 
@@ -72,8 +93,6 @@ export async function getProduct({ productSlug }: { productSlug: string }) {
 						},
 					];
 	}
-
-	const markdown = product?.content;
 
 	return { product, productImages };
 }
