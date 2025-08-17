@@ -1,5 +1,5 @@
 import { FileText, Image, Package, ShoppingCart, Users } from "lucide-react";
-import { Link, Outlet } from "react-router";
+import { data, Link, Outlet } from "react-router";
 import {
     Sidebar,
     SidebarContent,
@@ -14,6 +14,13 @@ import {
     SidebarProvider,
     SidebarTrigger
 } from "~/components/ui/sidebar";
+import { requireAdmin } from "~/server/auth.server";
+import type { Route } from "./+types/_adminLayout";
+
+export async function loader({ request }: Route.LoaderArgs) {
+    await requireAdmin(request);
+    return data(null)
+}
 
 export const AdminSidebar = () => {
     return (
@@ -55,6 +62,14 @@ export const AdminSidebar = () => {
                                     <Link to="/admin/customers">
                                         <Users className="size-4" />
                                         <span>Customers</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton asChild>
+                                    <Link to="/admin/users">
+                                        <Users className="size-4" />
+                                        <span>Users</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>

@@ -1,5 +1,3 @@
-import type { z } from "zod";
-import type { ProductSchema } from "~/routes/admin+/products.$productSlug";
 import { prisma } from "./db.server";
 
 export async function getProducts() {

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { Button } from "~/components/ui/button";
 import { DataTable } from "~/components/ui/data-table";
 import { adminGetProducts, deleteProduct, toggleProductStatus } from '~/server/admin/admin-products.server';
+import { requireAdmin } from "~/server/auth.server";
 import type { Route } from "./+types/products.index";
 import { adminProductsColumns } from "./admin-products-columns";
 
@@ -25,12 +26,16 @@ export const ActionSchema = z.discriminatedUnion("intent", [
 // Export individual schemas for components
 export { ToggleStatusSchema };
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+    await requireAdmin(request);
+
     const products = await adminGetProducts();
     return { products };
 }
 
 export async function action({ request }: Route.ActionArgs) {
+    // Require authentication for actions too
+    await requireAdmin(request);
     const formData = await request.formData();
 
     const submission = parseWithZod(formData, {
