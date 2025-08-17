@@ -6,6 +6,7 @@ import {
   ScrollRestoration
 } from "react-router";
 
+import '@mdxeditor/editor/style.css';
 import type { Route } from "./+types/root";
 import "./app.css";
 import { GeneralErrorBoundary } from "./components/error-boundary";

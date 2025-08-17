@@ -2,9 +2,8 @@ import { generateMeta } from "@forge42/seo-tools/remix/metadata";
 import { breadcrumbs } from '@forge42/seo-tools/structured-data/breadcrumb';
 import { product as structuredDataProduct } from '@forge42/seo-tools/structured-data/product';
 import { Calendar, Check, ChevronRight, Clock, Package, Shield, ShoppingCart, Truck } from "lucide-react";
-import Markdown from 'react-markdown';
 import { data, Link, useLoaderData } from "react-router";
-import remarkGfm from 'remark-gfm';
+import { MarkdownComponent } from "~/components/markdown";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
@@ -248,11 +247,7 @@ export default function ProductDetails() {
                             <div>
                                 <h2 className="text-2xl font-light mb-6">Description détaillée</h2>
                                 {product.content ? (
-                                    <div className="prose text-gray-700 font-light">
-                                        <Markdown remarkPlugins={[remarkGfm]} >
-                                            {product.content}
-                                        </Markdown>
-                                    </div>
+                                    <MarkdownComponent content={product.content} />
                                 ) : (
                                     <p className="text-gray-500 font-light">
                                         Aucune description détaillée disponible pour ce produit.
