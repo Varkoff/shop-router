@@ -1,15 +1,20 @@
-import { getFormProps, getInputProps, getTextareaProps, useForm } from '@conform-to/react';
+import { getFormProps, getInputProps, getSelectProps, getTextareaProps, useForm } from '@conform-to/react';
 import { parseWithZod } from '@conform-to/zod';
-import { data, Form, redirect } from 'react-router';
+import { ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { data, Form, Link, redirect, useNavigation } from 'react-router';
 import { z } from 'zod';
 import {
-    CheckboxField,
     ErrorList,
     Field,
-    TextareaField,
+    PriceField,
+    SelectField,
+    SwitchField
 } from '~/components/forms';
+import { MarkdownField } from '~/components/markdown-field';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
+import { Label } from '~/components/ui/label';
 import {
     createProduct,
     isSlugTaken,
@@ -113,6 +118,8 @@ export default function ProductForm({
     const { product, isCreating } = loaderData;
     const lastResult = actionData?.result;
 
+    const [content, setContent] = useState(product?.content || '');
+
     const [form, fields] = useForm({
         lastResult,
         onValidate({ formData }) {
@@ -130,13 +137,29 @@ export default function ProductForm({
         },
     });
 
+
+    const navigation = useNavigation()
+    const isLoading = navigation.state === "submitting"
+
     return (
         <div className='container mx-auto px-4 py-8'>
             <Card className='max-w-4xl mx-auto'>
                 <CardHeader>
-                    <CardTitle>
-                        {isCreating ? 'Créer un produit' : `Modifier ${product?.name}`}
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>
+                            {isCreating ? 'Créer un produit' : `Modifier ${product?.name}`}
+                        </CardTitle>
+                        {!isCreating && product && (
+                            <Button variant="outline" size="sm" asChild className='h-fit'>
+                                <Link to={`/products/${product.slug}`} target="_blank"
+
+                                    className='flex items-center gap-2'>
+                                    <ExternalLink className="size-4 shrink-0 mr-2" />
+                                    <span>Voir la page publique</span>
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Form method='POST' {...getFormProps(form)} className='space-y-6'>
@@ -177,7 +200,9 @@ export default function ProductForm({
                             errors={fields.description.errors}
                         />
 
-                        <TextareaField
+                        <MarkdownField
+                            content={content}
+                            onContentChange={setContent}
                             labelProps={{ children: 'Contenu détaillé (Markdown)' }}
                             textareaProps={{
                                 ...getTextareaProps(fields.content),
@@ -188,7 +213,7 @@ export default function ProductForm({
                         />
 
                         <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-                            <Field
+                            <PriceField
                                 labelProps={{ children: 'Prix (en centimes)' }}
                                 inputProps={{
                                     ...getInputProps(fields.priceCents, {
@@ -200,14 +225,21 @@ export default function ProductForm({
                                 errors={fields.priceCents.errors}
                             />
 
-                            <Field
+                            <SelectField
                                 labelProps={{ children: 'Devise' }}
-                                inputProps={{
-                                    ...getInputProps(fields.currency, {
-                                        type: 'text',
-                                    }),
-                                    placeholder: 'EUR',
+
+                                selectProps={{
+                                    ...getSelectProps(fields.currency),
+                                    defaultValue: fields.currency.initialValue,
                                 }}
+                                placeholder="Sélectionner une devise"
+                                options={[
+                                    { value: 'EUR', label: '€ Euro' },
+                                    { value: 'USD', label: '$ Dollar américain' },
+                                    { value: 'GBP', label: '£ Livre sterling' },
+                                    { value: 'CHF', label: '₣ Franc suisse' },
+                                    { value: 'CAD', label: '$ Dollar canadien' },
+                                ]}
                                 errors={fields.currency.errors}
                             />
 
@@ -224,16 +256,33 @@ export default function ProductForm({
                             />
                         </div>
 
-                        <CheckboxField
+                        <SwitchField
                             labelProps={{ children: 'Produit actif' }}
-                            buttonProps={{
+                            switchProps={{
                                 ...getInputProps(fields.isActive, { type: 'checkbox' }),
+                                type: "button",
                             }}
                             errors={fields.isActive.errors}
                         />
 
-                        <div className='flex gap-4'>
-                            <Button type='submit' className='flex-1'>
+                        {!isCreating && product?.images && product.images.length > 0 && (
+                            <div className="space-y-2">
+                                <Label>Image du produit</Label>
+                                <div className="w-32 h-32 rounded-lg overflow-hidden bg-gray-100 border">
+                                    <img
+                                        src={product.images[0].url}
+                                        alt={product.name || 'Image du produit'}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className='flex gap-4 w-full'>
+                            <Button type='submit'
+                                isLoading={isLoading}
+                                disabled={isLoading}
+                            >
                                 {isCreating ? 'Créer le produit' : 'Mettre à jour'}
                             </Button>
                             <Button type='button' variant='outline' asChild>
