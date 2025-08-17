@@ -22,6 +22,7 @@ import {
     isSlugTaken,
     updateProduct,
 } from '~/server/admin/admin-products.server';
+import { requireAdmin } from '~/server/auth.server';
 import { linkImagesToProduct, unlinkImageFromProduct } from '~/server/db.server';
 import { getProduct } from '~/server/products.server';
 import { listS3Objects } from '~/server/s3.server';
@@ -59,7 +60,8 @@ export const ActionSchema = z.discriminatedUnion('intent', [
 
 
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
+    await requireAdmin(request);
     const isCreating = params.productSlug === 'new';
 
     const [productResult, s3Result] = await Promise.all([
@@ -85,6 +87,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
+    await requireAdmin(request);
     const formData = await request.formData();
     const productSlug = params.productSlug;
     const isCreating = productSlug === 'new';

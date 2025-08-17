@@ -1,15 +1,18 @@
 import {
+  data,
   Links,
   Meta,
   Outlet,
   Scripts,
-  ScrollRestoration
+  ScrollRestoration,
+  useRouteLoaderData
 } from "react-router";
 
 import '@mdxeditor/editor/style.css';
 import type { Route } from "./+types/root";
 import "./app.css";
 import { GeneralErrorBoundary } from "./components/error-boundary";
+import { getOptionalUser } from "./server/auth.server";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -25,7 +28,22 @@ export const links: Route.LinksFunction = () => [
 ];
 
 
+export async function loader({ request }: Route.LoaderArgs) {
+  const user = await getOptionalUser(request);
+  return data({ user })
+}
 
+export function useOptionalUser() {
+  return useRouteLoaderData<typeof loader>("root")?.user || null
+}
+
+export function useUser() {
+  const user = useOptionalUser()
+  if (!user) {
+    throw new Error("User not found")
+  }
+  return user
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (

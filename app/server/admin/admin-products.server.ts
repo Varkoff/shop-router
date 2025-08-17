@@ -1,6 +1,15 @@
-import type { z } from "zod";
-import type { ProductSchema } from "~/routes/admin+/products.$productSlug";
 import { prisma } from "../db.server";
+
+type ProductData = {
+	name: string;
+	slug: string;
+	description?: string;
+	content?: string;
+	priceCents: number;
+	currency: string;
+	stock: number;
+	isActive: boolean;
+};
 
 export async function adminGetProducts() {
 	const products = await prisma.product.findMany({
@@ -48,7 +57,7 @@ export async function createProduct({
 		description,
 	},
 }: {
-	data: z.infer<typeof ProductSchema>;
+	data: ProductData;
 }) {
 	return await prisma.product.create({
 		data: {
@@ -73,7 +82,7 @@ export async function updateProduct({
 	productSlug,
 }: {
 	productSlug: string;
-	data: z.infer<typeof ProductSchema>;
+	data: ProductData;
 }) {
 	let hasUpdatedSlug = false;
 	const existingProduct = await prisma.product.findUnique({

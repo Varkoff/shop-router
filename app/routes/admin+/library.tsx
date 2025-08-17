@@ -9,6 +9,7 @@ import { ErrorList } from '~/components/forms';
 import { Alert, AlertDescription } from '~/components/ui/alert';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
+import { requireAdmin } from '~/server/auth.server';
 import { createImageFromUrl } from '~/server/db.server';
 import {
     deleteFileFromS3,
@@ -54,7 +55,8 @@ const LibraryFormSchema = z.discriminatedUnion('intent', [
     UploadImageSchema,
 ]);
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+    await requireAdmin(request);
     const s3Result = await listS3Objects();
 
     if (!s3Result.success) {
@@ -69,6 +71,7 @@ export async function loader() {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+    await requireAdmin(request);
     const formData = await parseFormData(request, { maxFileSize: MAX_SIZE });
 
     const submission = await parseWithZod(formData, {
