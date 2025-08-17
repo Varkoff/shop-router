@@ -2,6 +2,7 @@ import { ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router';
 import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
+
 import { cn } from '~/lib/utils';
 import type { getProducts } from '~/server/products.server';
 
@@ -66,13 +67,13 @@ export const ProductCard = ({
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            // Logique pour ajouter au panier
+                            // Navigation vers la page produit (géré par le Link parent)
                         }}
-                        aria-label="Ajouter au panier"
+                        aria-label="Voir le produit"
                     >
                         <ShoppingCart className="h-4 w-4 mr-1 md:mr-2" />
-                        <span className="hidden md:inline">Ajouter</span>
-                        <span className="md:hidden">+</span>
+                        <span className="hidden md:inline">Voir le produit</span>
+                        <span className="md:hidden">→</span>
                     </Button>
                 </div>
             </div>

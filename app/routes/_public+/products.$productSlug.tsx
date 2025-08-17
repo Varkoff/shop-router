@@ -1,13 +1,14 @@
 import { generateMeta } from "@forge42/seo-tools/remix/metadata";
 import { breadcrumbs } from '@forge42/seo-tools/structured-data/breadcrumb';
 import { product as structuredDataProduct } from '@forge42/seo-tools/structured-data/product';
-import { Calendar, Check, ChevronRight, Clock, Package, Shield, ShoppingCart, Truck } from "lucide-react";
+import { Calendar, Check, ChevronRight, Clock, Minus, Package, Plus, Shield, ShoppingCart, Trash2, Truck } from "lucide-react";
 import { data, Link, useLoaderData } from "react-router";
 import { MarkdownComponent } from "~/components/markdown";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
+import { useCartContext } from "~/contexts/cart-context";
 import { getProduct } from "~/server/products.server";
 import type { Route } from "./+types/products.$productSlug";
 export async function loader({ params }: Route.LoaderArgs) {
@@ -98,11 +99,39 @@ const formatDate = (date: Date | string) => {
 
 export default function ProductDetails() {
     const { product, productImages } = useLoaderData<typeof loader>();
-
-
+    const { addToCart, getItemQuantity, updateQuantity, removeFromCart } = useCartContext();
 
     const isInStock = product.stock > 0;
     const stockStatus = product.stock > 10 ? 'En stock' : product.stock > 0 ? `Plus que ${product.stock} en stock` : 'Rupture de stock';
+
+    const currentQuantity = getItemQuantity(product.id);
+
+    const handleAddToCart = () => {
+        // Créer un produit compatible avec le type attendu par addToCart
+        const cartProduct = {
+            ...product,
+            imageUrl: productImages[0]?.url
+        };
+        addToCart(cartProduct, 1);
+    };
+
+    const handleIncrement = () => {
+        if (currentQuantity < product.stock) {
+            updateQuantity(product.id, currentQuantity + 1);
+        }
+    };
+
+    const handleDecrement = () => {
+        if (currentQuantity > 1) {
+            updateQuantity(product.id, currentQuantity - 1);
+        } else {
+            updateQuantity(product.id, 0); // This will remove the item
+        }
+    };
+
+    const handleRemoveFromCart = () => {
+        removeFromCart(product.id);
+    };
 
     return (
         <div className="min-h-screen bg-white text-black">
@@ -209,15 +238,74 @@ export default function ProductDetails() {
                             </div>
 
                             {/* Add to Cart */}
-                            <div className="space-y-4">
-                                <Button
-                                    size="lg"
-                                    disabled={!isInStock || !product.isActive}
-                                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg py-6 rounded-full font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <ShoppingCart className="h-5 w-5 mr-3" />
-                                    {isInStock && product.isActive ? 'Ajouter au panier' : 'Non disponible'}
-                                </Button>
+                            <div className="space-y-6">
+                                {/* Add to Cart Button or Quantity Controls */}
+                                <div className="space-y-3">
+                                    {currentQuantity > 0 ? (
+                                        <div className="space-y-3">
+                                            {/* Quantity Controls with Cart and Trash Icons */}
+                                            <div className="flex items-center justify-center gap-4">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleDecrement}
+                                                    className="h-10 w-10 p-0"
+                                                >
+                                                    <Minus className="h-4 w-4" />
+                                                </Button>
+
+                                                <div className="flex items-center gap-2">
+                                                    <ShoppingCart className="h-4 w-4 text-green-600" />
+                                                    <span className="w-12 text-center font-medium text-lg">
+                                                        {currentQuantity}
+                                                    </span>
+                                                </div>
+
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleIncrement}
+                                                    disabled={currentQuantity >= product.stock}
+                                                    className="h-10 w-10 p-0"
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                </Button>
+
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleRemoveFromCart}
+                                                    className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:border-red-300"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                            <Link
+                                                to="/cart"
+                                                className={buttonVariants({
+                                                    size: "lg",
+                                                    className: "w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-lg py-6 rounded-full font-medium shadow-lg"
+                                                })}
+                                            >
+                                                <ShoppingCart className="h-5 w-5 mr-3" />
+                                                Voir le panier
+                                            </Link>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            size="lg"
+                                            onClick={handleAddToCart}
+                                            disabled={!isInStock || !product.isActive}
+                                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg py-6 rounded-full font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <ShoppingCart className="h-5 w-5 mr-3" />
+                                            {isInStock && product.isActive
+                                                ? 'Ajouter au panier'
+                                                : 'Non disponible'
+                                            }
+                                        </Button>
+                                    )}
+                                </div>
 
                                 <div className="grid grid-cols-3 gap-4 text-center">
                                     <div className="flex flex-col items-center space-y-2">

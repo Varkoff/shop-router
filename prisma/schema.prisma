@@ -133,6 +133,8 @@ model CartItem {
   quantity       Int      @default(1)
   unitPriceCents Int
   createdAt      DateTime @default(now())
+
+  @@unique([cartId, productId])
 }
 
 model Order {
