@@ -1,4 +1,4 @@
-import { FileText, Package, ShoppingCart, Users } from "lucide-react";
+import { FileText, Image, Package, ShoppingCart, Users } from "lucide-react";
 import { Link, Outlet } from "react-router";
 import {
     Sidebar,
@@ -31,6 +31,14 @@ export const AdminSidebar = () => {
                                     <Link to="/admin/products">
                                         <Package className="size-4" />
                                         <span>Products</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton asChild>
+                                    <Link to="/admin/library">
+                                        <Image className="size-4" />
+                                        <span>Library</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
