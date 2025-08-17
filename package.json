@@ -9,11 +9,13 @@
 		"typecheck": "react-router typegen && tsc"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.864.0",
 		"@conform-to/react": "^1.8.2",
 		"@conform-to/zod": "^1.8.2",
 		"@forge42/seo-tools": "^1.4.5",
 		"@hookform/resolvers": "^5.2.1",
 		"@mdxeditor/editor": "^3.42.0",
+		"@mjackson/form-data-parser": "^0.9.1",
 		"@prisma/client": "^6.13.0",
 		"@prisma/extension-accelerate": "^2.0.2",
 		"@radix-ui/react-accordion": "^1.2.11",

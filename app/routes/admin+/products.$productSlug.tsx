@@ -1,6 +1,6 @@
 import { getFormProps, getInputProps, getSelectProps, getTextareaProps, useForm } from '@conform-to/react';
 import { parseWithZod } from '@conform-to/zod';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { useState } from 'react';
 import { data, Form, Link, redirect, useNavigation } from 'react-router';
 import { z } from 'zod';
@@ -11,7 +11,9 @@ import {
     SelectField,
     SwitchField
 } from '~/components/forms';
+import { ImageSelector } from '~/components/image-selector';
 import { MarkdownField } from '~/components/markdown-field';
+import { Alert, AlertDescription } from '~/components/ui/alert';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Label } from '~/components/ui/label';
@@ -20,10 +22,13 @@ import {
     isSlugTaken,
     updateProduct,
 } from '~/server/admin/admin-products.server';
+import { linkImagesToProduct, unlinkImageFromProduct } from '~/server/db.server';
 import { getProduct } from '~/server/products.server';
+import { listS3Objects } from '~/server/s3.server';
 import type { Route } from './+types/products.$productSlug';
 
-export const ProductSchema = z.object({
+const ProductSchema = z.object({
+    intent: z.literal('update-product'),
     name: z.string().min(1, 'Le nom est requis'),
     slug: z.string().min(1, 'Le slug est requis'),
     description: z.string().optional(),
@@ -34,80 +39,163 @@ export const ProductSchema = z.object({
     isActive: z.boolean().default(false),
 });
 
+const LinkImagesSchema = z.object({
+    intent: z.literal('link-images'),
+    productId: z.string().uuid(),
+    imageUrls: z.array(z.string().url()).min(1, 'Au moins une image est requise'),
+});
+
+const UnlinkImageSchema = z.object({
+    intent: z.literal('unlink-image'),
+    productId: z.string().uuid(),
+    imageUrl: z.string().url(),
+});
+
+export const ActionSchema = z.discriminatedUnion('intent', [
+    ProductSchema,
+    LinkImagesSchema,
+    UnlinkImageSchema,
+]);
+
+
+
 export async function loader({ params }: Route.LoaderArgs) {
     const isCreating = params.productSlug === 'new';
 
-    if (isCreating) {
-        return data({
-            product: null,
-            isCreating: true,
-        });
-    }
+    const [productResult, s3Result] = await Promise.all([
+        isCreating ? { product: null } : getProduct({ productSlug: params.productSlug }),
+        listS3Objects(),
+    ]);
 
-    const { product } = await getProduct({ productSlug: params.productSlug });
-
-    if (!product) {
+    if (!isCreating && !productResult.product) {
         throw new Response('Produit non trouvé', { status: 404 });
     }
 
+    if (!s3Result.success) {
+        throw new Response(s3Result.error || 'Erreur lors du chargement des images', {
+            status: 500,
+        });
+    }
+
     return data({
-        product,
-        isCreating: false,
+        product: productResult.product,
+        isCreating,
+        images: s3Result.objects || [],
     });
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
     const formData = await request.formData();
-    const productSlug = params.productSlug
+    const productSlug = params.productSlug;
     const isCreating = productSlug === 'new';
 
     const submission = await parseWithZod(formData, {
+        schema: ActionSchema,
         async: true,
-        schema: ProductSchema.superRefine(async (data, ctx) => {
-            // Vérifier si le slug est déjà pris
-            const slugTaken = await isSlugTaken({
-                slug: data.slug,
-            });
-
-            if (slugTaken && data.slug !== productSlug) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: 'Le slug est déjà attaché à un produit',
-                    path: ['slug'],
-                });
-            }
-        }),
     });
 
     if (submission.status !== 'success') {
         return data({ result: submission.reply() }, { status: 400 });
     }
 
-    try {
-        if (isCreating) {
-            const newProduct = await createProduct({ data: submission.value });
-            return redirect(`/admin/products/${newProduct.slug}`);
+    switch (submission.value.intent) {
+        case 'link-images': {
+            try {
+                const result = await linkImagesToProduct({ data: submission.value });
+                return data({
+                    result: submission.reply(),
+                    success: `${result.linkedCount} image${result.linkedCount > 1 ? 's' : ''} liée${result.linkedCount > 1 ? 's' : ''} avec succès !`
+                });
+            } catch (error) {
+                return data(
+                    {
+                        result: submission.reply({
+                            formErrors: [error instanceof Error ? error.message : 'Erreur lors de la liaison des images'],
+                        }),
+                    },
+                    { status: 500 }
+                );
+            }
         }
 
-        const updatedProduct = await updateProduct({
-            productSlug: productSlug,
-            data: submission.value,
-        });
-
-        if (updatedProduct.hasUpdatedSlug) {
-            return redirect(`/admin/products/${updatedProduct.slug}`);
+        case 'unlink-image': {
+            try {
+                await unlinkImageFromProduct({
+                    imageUrl: submission.value.imageUrl,
+                    productId: submission.value.productId,
+                });
+                return data({
+                    result: submission.reply(),
+                    success: 'Image déconnectée avec succès !'
+                });
+            } catch (error) {
+                return data(
+                    {
+                        result: submission.reply({
+                            formErrors: [error instanceof Error ? error.message : 'Erreur lors de la déconnexion de l\'image'],
+                        }),
+                    },
+                    { status: 500 }
+                );
+            }
         }
-        return data({ result: submission.reply() });
 
-    } catch {
-        return data(
-            {
-                result: submission.reply({
-                    formErrors: ['Une erreur est survenue lors de la sauvegarde'],
+        case 'update-product': {
+            // Validate slug uniqueness for product updates
+            const slugValidation = await parseWithZod(formData, {
+                async: true,
+                schema: ProductSchema.superRefine(async (data, ctx) => {
+                    const slugTaken = await isSlugTaken({
+                        slug: data.slug,
+                    });
+
+                    if (slugTaken && data.slug !== productSlug) {
+                        ctx.addIssue({
+                            code: z.ZodIssueCode.custom,
+                            message: 'Le slug est déjà attaché à un produit',
+                            path: ['slug'],
+                        });
+                    }
                 }),
-            },
-            { status: 500 }
-        );
+            });
+
+            if (slugValidation.status !== 'success') {
+                return data({ result: slugValidation.reply() }, { status: 400 });
+            }
+
+            try {
+                if (isCreating) {
+                    const { intent: _, ...productData } = submission.value;
+                    const newProduct = await createProduct({ data: productData });
+                    return redirect(`/admin/products/${newProduct.slug}`);
+                }
+
+                const { intent: _, ...productData } = submission.value;
+                const updatedProduct = await updateProduct({
+                    productSlug: productSlug,
+                    data: productData,
+                });
+
+                if (updatedProduct.hasUpdatedSlug) {
+                    return redirect(`/admin/products/${updatedProduct.slug}`);
+                }
+                return data({ result: submission.reply() });
+
+            } catch {
+                return data(
+                    {
+                        result: submission.reply({
+                            formErrors: ['Une erreur est survenue lors de la sauvegarde'],
+                        }),
+                    },
+                    { status: 500 }
+                );
+            }
+        }
+
+        default: {
+            return data({ result: null }, { status: 400 });
+        }
     }
 }
 
@@ -115,15 +203,18 @@ export default function ProductForm({
     loaderData,
     actionData,
 }: Route.ComponentProps) {
-    const { product, isCreating } = loaderData;
+    const { product, isCreating, images } = loaderData;
     const lastResult = actionData?.result;
+    const successMessage = actionData && 'success' in actionData ? actionData.success as string : undefined;
 
     const [content, setContent] = useState(product?.content || '');
 
     const [form, fields] = useForm({
         lastResult,
         onValidate({ formData }) {
-            return parseWithZod(formData, { schema: ProductSchema });
+            return parseWithZod(formData, {
+                schema: ProductSchema.omit({ intent: true })
+            });
         },
         defaultValue: {
             name: product?.name || '',
@@ -138,8 +229,8 @@ export default function ProductForm({
     });
 
 
-    const navigation = useNavigation()
-    const isLoading = navigation.state === "submitting"
+    const navigation = useNavigation();
+    const isLoading = navigation.state === "submitting";
 
     return (
         <div className='container mx-auto px-4 py-8'>
@@ -162,7 +253,14 @@ export default function ProductForm({
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Form method='POST' {...getFormProps(form)} className='space-y-6'>
+                    {successMessage && (
+                        <Alert className="mb-6">
+                            <AlertDescription>{successMessage}</AlertDescription>
+                        </Alert>
+                    )}
+
+                    <Form method='POST' {...getFormProps(form)} className='space-y-6' data-image-form>
+                        <input type="hidden" name="intent" value="update-product" />
                         <ErrorList id={form.errorId} errors={form.errors} />
 
                         <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
@@ -265,16 +363,58 @@ export default function ProductForm({
                             errors={fields.isActive.errors}
                         />
 
-                        {!isCreating && product?.images && product.images.length > 0 && (
-                            <div className="space-y-2">
-                                <Label>Image du produit</Label>
-                                <div className="w-32 h-32 rounded-lg overflow-hidden bg-gray-100 border">
-                                    <img
-                                        src={product.images[0].url}
-                                        alt={product.name || 'Image du produit'}
-                                        className="w-full h-full object-cover"
-                                    />
+                        {!isCreating && product && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <Label>Images du produit</Label>
+                                    <div className="flex gap-2">
+                                        <ImageSelector
+                                            images={images}
+                                            productId={product.id}
+                                            selectedImages={product.images?.map(img => ({
+                                                key: img.url,
+                                                url: img.url,
+                                                name: img.alt || 'Image',
+                                                size: 0,
+                                                lastModified: new Date()
+                                            })) || []}
+                                            trigger={
+                                                <Button type="button" variant="outline" size="sm" className="gap-2">
+                                                    <ImageIcon className="w-4 h-4" />
+                                                    Choisir des images
+                                                </Button>
+                                            }
+                                        />
+                                    </div>
                                 </div>
+
+                                {product.images && product.images.length > 0 && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        {product.images.map((image, index) => (
+                                            <div key={image.id} className="space-y-2">
+                                                <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 border">
+                                                    <img
+                                                        src={image.url}
+                                                        alt={image.alt || `Image ${index + 1}`}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <p className="text-xs text-muted-foreground text-center truncate">
+                                                    {image.alt || `Image ${index + 1}`}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {(!product.images || product.images.length === 0) && (
+                                    <div className="text-center py-8 border border-dashed rounded-lg">
+                                        <ImageIcon className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                                        <p className="text-sm text-muted-foreground">
+                                            Aucune image associée à ce produit
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
