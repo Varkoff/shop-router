@@ -5,7 +5,7 @@ import type {
 	UpdateUserSchema,
 	VerifyEmailSchema,
 } from "~/routes/admin+/users+/$userId";
-import type { CreateUserSchema } from "~/routes/admin+/users+/_usersLayout";
+import type { CreateUserSchema } from "~/routes/admin+/users+/index";
 import { auth } from "../auth.server";
 import { prisma } from "../db.server";
 import {
