@@ -1,12 +1,16 @@
 import { parseWithZod } from '@conform-to/zod';
-import { data, redirect } from 'react-router';
+import { data, redirect, useFetcher } from 'react-router';
 import { z } from 'zod';
-import { CartHeader, CartItem, EmptyCart, OrderSummary } from '~/components/cart';
+import { CartHeader } from '~/components/cart/cart-header';
+import { CartItem } from '~/components/cart/cart-item';
+import { EmptyCart } from '~/components/cart/empty-cart';
+import { OrderSummary } from '~/components/cart/order-summary';
 import { useCartContext } from '~/contexts/cart-context';
 import { useCart } from '~/hooks/use-cart';
 import { getOptionalUser } from '~/server/auth.server';
 import { clearCart } from '~/server/customer/cart.server';
 import { createOrder } from '~/server/customer/orders.server';
+import { createStripeCheckoutSession } from '~/server/stripe.server';
 import type { Route } from './+types/cart';
 
 
@@ -16,6 +20,11 @@ const CartItemSchema = z.object({
     quantity: z.coerce.number().int().positive('Quantity must be positive'),
 });
 
+// Schéma Zod pour vider le panier
+const ClearCartSchema = z.object({
+    intent: z.literal('clear-cart'),
+});
+
 // Schéma Zod pour la création de commande
 export const CreateOrderSchema = z.object({
     intent: z.literal('create-order'),
@@ -23,17 +32,27 @@ export const CreateOrderSchema = z.object({
     guestEmail: z.string().email('Email invalide').optional(),
 });
 
+// Schéma combiné pour toutes les actions
+const CartPageActionSchema = z.discriminatedUnion('intent', [
+    ClearCartSchema,
+    CreateOrderSchema,
+]);
+
+
+
 export async function action({ request }: Route.ActionArgs) {
     const user = await getOptionalUser(request);
     const formData = await request.formData();
 
     const submission = parseWithZod(formData, {
-        schema: CreateOrderSchema.superRefine((data, ctx) => {
-            if (!user && !data.guestEmail) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: 'Email requis pour les commandes sans compte',
-                });
+        schema: CartPageActionSchema.superRefine((data, ctx) => {
+            if (data.intent === "create-order") {
+                if (!user && !data.guestEmail) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: 'Email requis pour les commandes sans compte',
+                    });
+                }
             }
         }),
     });
@@ -42,40 +61,75 @@ export async function action({ request }: Route.ActionArgs) {
         return data({ result: submission.reply() }, { status: 400 });
     }
 
-    const { guestEmail } = submission.value;
-    try {
-        // Créer la commande avec les items du panier
-        const order = await createOrder({
-            cartData: submission.value,
-            userId: user?.id,
-        });
+    switch (submission.value.intent) {
+        case 'clear-cart': {
+            if (!user) {
+                return data({ result: submission.reply() }, { status: 401 });
+            }
 
-        if (user) {
-            await clearCart({ userId: user.id });
+            try {
+                await clearCart({ userId: user.id });
+                return data({ result: submission.reply() });
+            } catch (error) {
+                console.error('Clear cart error:', error);
+                return data({ result: submission.reply() }, { status: 500 });
+            }
         }
+        case "create-order": {
+            const { guestEmail } = submission.value;
+            try {
+                // Créer la commande avec les items du panier
+                const order = await createOrder({
+                    cartData: submission.value,
+                    userId: user?.id,
+                });
 
-        // Rediriger vers la page de confirmation ou de paiement avec paramètre de succès
-        const redirectUrl = user
-            ? `/orders/${order.id}?success=true`
-            : `/orders/${order.id}?email=${encodeURIComponent(guestEmail || '')}&success=true`;
-        return redirect(redirectUrl);
+                // Construire les URLs de succès et d'annulation
+                const baseUrl = new URL(request.url).origin;
+                const successUrl = user
+                    ? `${baseUrl}/orders/${order.id}?success=true`
+                    : `${baseUrl}/orders/${order.id}?email=${encodeURIComponent(guestEmail || '')}&success=true`;
+                const cancelUrl = `${baseUrl}/cart`;
 
-    } catch (error) {
-        console.error('Order creation error:', error);
+                // Créer la session Stripe Checkout
+                const stripeSession = await createStripeCheckoutSession({
+                    order,
+                    user,
+                    guestEmail,
+                    successUrl,
+                    cancelUrl,
+                });
 
-        if (error instanceof Error) {
-            return data({
-                result: submission.reply({
-                    formErrors: [error.message]
-                })
-            }, { status: 400 });
+                // Vider le panier uniquement pour les utilisateurs connectés
+                // Pour les invités, on le fera via le webhook après paiement réussi
+                if (user) {
+                    await clearCart({ userId: user.id });
+                }
+
+                // Rediriger vers Stripe Checkout
+                if (!stripeSession.url) {
+                    throw new Error('Erreur lors de la création de la session Stripe');
+                }
+                return redirect(stripeSession.url);
+
+            } catch (error) {
+                console.error('Order creation error:', error);
+
+                if (error instanceof Error) {
+                    return data({
+                        result: submission.reply({
+                            formErrors: [error.message]
+                        })
+                    }, { status: 400 });
+                }
+
+                return data({
+                    result: submission.reply({
+                        formErrors: ['Erreur lors de la création de la commande']
+                    })
+                }, { status: 500 });
+            }
         }
-
-        return data({
-            result: submission.reply({
-                formErrors: ['Erreur lors de la création de la commande']
-            })
-        }, { status: 500 });
     }
 }
 
@@ -89,6 +143,20 @@ export default function CartRoute() {
     } = useCartContext()
 
     const { clearCart } = useCart()
+    const clearCartFetcher = useFetcher()
+
+    // Fonction pour vider le panier
+    const handleClearCart = () => {
+        const formData = new FormData()
+        formData.set('intent', 'clear-cart')
+
+        clearCartFetcher.submit(formData, {
+            method: 'POST',
+        })
+
+        // Pour les utilisateurs non connectés, vider aussi le localStorage
+        clearCart({ disableAuthenticatedClearCart: true })
+    }
 
     if (cart.items.length === 0) {
         return <EmptyCart />
@@ -100,7 +168,7 @@ export default function CartRoute() {
                 <div className="max-w-4xl mx-auto">
                     <CartHeader
                         totalItems={getTotalItems()}
-                        onClearCart={clearCart}
+                        onClearCart={handleClearCart}
                     />
 
                     <div className="grid lg:grid-cols-3 gap-8">

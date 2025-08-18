@@ -95,7 +95,19 @@ export async function getOptionalUser(request: Request) {
 		const session = await auth.api.getSession({
 			headers: request.headers,
 		});
-		return session?.user || null;
+		let stripeCustomerId: string | null = null;
+		if (session?.user) {
+			const customerData = await prisma.user.findUnique({
+				where: { id: session.user.id },
+				select: {
+					stripeCustomerId: true,
+				},
+			});
+			if (customerData) {
+				stripeCustomerId = customerData.stripeCustomerId;
+			}
+		}
+		return session?.user ? { ...session?.user, stripeCustomerId } : null;
 	} catch {
 		return null;
 	}

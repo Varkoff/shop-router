@@ -13,6 +13,9 @@ export async function getUserCart(userId: string) {
 						},
 					},
 				},
+				orderBy: {
+					id: "asc",
+				},
 			},
 		},
 	});
@@ -66,6 +69,7 @@ export async function addToCart({
 	if (!product || !product.isActive) {
 		throw new Error("Product not found or inactive");
 	}
+	console.log(product, quantity);
 
 	if (product.stock < quantity) {
 		throw new Error("Insufficient stock");
@@ -85,6 +89,7 @@ export async function addToCart({
 
 	if (existingItem) {
 		const newQuantity = existingItem.quantity + quantity;
+
 		if (newQuantity > product.stock) {
 			throw new Error("Insufficient stock");
 		}

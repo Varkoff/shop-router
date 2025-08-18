@@ -1,15 +1,13 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react';
 import { getZodConstraint } from '@conform-to/zod';
-import { Fragment, useState } from 'react';
+import { Fragment } from 'react';
 import { Form, Link, useActionData, useNavigation } from 'react-router';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
-import { Input } from '~/components/ui/input';
-import { Label } from '~/components/ui/label';
 import type { Cart } from '~/hooks/use-cart';
 import { useOptionalUser } from '~/root';
 import { CreateOrderSchema, type action as createOrderAction } from '~/routes/_public+/cart';
-import { ErrorList } from '../forms';
+import { ErrorList, Field } from '../forms';
 
 interface OrderSummaryProps {
     totalItems: number;
@@ -24,7 +22,6 @@ export const OrderSummary = ({
 }: OrderSummaryProps) => {
     const user = useOptionalUser();
     const actionData = useActionData<typeof createOrderAction>()
-    const [guestEmail, setGuestEmail] = useState('');
     const [form, fields] = useForm({
         constraint: getZodConstraint(CreateOrderSchema),
         defaultValue: {
@@ -33,7 +30,7 @@ export const OrderSummary = ({
                 productId: item.product.id,
                 quantity: item.quantity,
             })),
-            guestEmail: user ? undefined : guestEmail,
+            guestEmail: user ? undefined : '',
         },
         lastResult: actionData?.result
     });
@@ -70,17 +67,18 @@ export const OrderSummary = ({
                 {/* Email pour les clients déconnectés */}
                 {!user && (
                     <div className='pt-4 border-t'>
-                        <Label htmlFor='guestEmail' className='text-sm font-medium'>
-                            Votre email pour la commande
-                        </Label>
-                        <Input
-                            id='guestEmail'
-                            type='email'
-                            value={guestEmail}
-                            onChange={(e) => setGuestEmail(e.target.value)}
-                            placeholder='votre@email.com'
-                            className='mt-2'
-                            required
+                        <Field
+                            labelProps={{
+                                children: 'Votre email pour la commande',
+                                className: 'text-sm font-medium'
+                            }}
+                            inputProps={{
+                                ...getInputProps(fields.guestEmail, { type: 'email' }),
+                                placeholder: 'votre@email.com',
+                                required: true,
+                            }}
+                            errors={fields.guestEmail.errors}
+                            className='mb-0'
                         />
                     </div>
                 )}
@@ -126,13 +124,13 @@ export const OrderSummary = ({
                             </Fragment>
                         );
                     })}
-                    <input {...getInputProps(fields.guestEmail, { type: 'hidden' })} />
+
                     <ErrorList errors={form.errors} />
                     <Button
                         type='submit'
                         className='w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-medium'
                         size='lg'
-                        disabled={!user && !guestEmail.trim() || isLoading}
+                        disabled={!user && !fields.guestEmail.value?.trim() || isLoading}
                         isLoading={isLoading}
                     >
                         Commander maintenant

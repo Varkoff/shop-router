@@ -1,5 +1,7 @@
 import { Stripe } from "stripe";
 import { adminGetProduct } from "./admin/admin-products.server";
+import type { getOptionalUser } from "./auth.server";
+import type { createOrder } from "./customer/orders.server";
 import { prisma } from "./db.server";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -239,4 +241,102 @@ export async function deleteStripeProduct(productId: string) {
 		console.error("Failed to archive Stripe product:", error);
 		return null;
 	}
+}
+
+// Fonction pour créer une session Stripe Checkout
+export async function createStripeCheckoutSession({
+	order,
+	user,
+	guestEmail,
+	successUrl,
+	cancelUrl,
+}: {
+	order: Awaited<ReturnType<typeof createOrder>>;
+	user?: Awaited<ReturnType<typeof getOptionalUser>>;
+	guestEmail?: string;
+	successUrl: string;
+	cancelUrl: string;
+}) {
+	// Préparer les line items pour Stripe
+	const lineItems = await Promise.all(
+		order.items.map(async (item) => {
+			// Vérifier que le productId existe
+			if (!item.productId) {
+				throw new Error(`Product ID is missing for item ${item.productName}`);
+			}
+
+			// Récupérer le produit pour obtenir le stripePriceId
+			const product = await prisma.product.findUnique({
+				where: { id: item.productId },
+				select: { stripePriceId: true, name: true },
+			});
+
+			if (!product?.stripePriceId) {
+				throw new Error(
+					`Product ${item.productName} doesn't have a Stripe price ID`,
+				);
+			}
+
+			return {
+				price: product.stripePriceId,
+				quantity: item.quantity,
+			};
+		}),
+	);
+
+	// // Gérer le customer Stripe
+	// let customerId = user?.stripeCustomerId;
+
+	// // Si l'utilisateur n'a pas de customer Stripe, en créer un
+	// if (user && !customerId) {
+	// 	const customer = await stripe.customers.create({
+	// 		email: user.email,
+	// 		name: user.name || undefined,
+	// 		metadata: {
+	// 			userId: user.id,
+	// 		},
+	// 	});
+
+	// 	// Mettre à jour l'utilisateur avec le customer ID
+	// 	await prisma.user.update({
+	// 		where: { id: user.id },
+	// 		data: { stripeCustomerId: customer.id },
+	// 	});
+
+	// 	customerId = customer.id;
+	// }
+
+	// Créer la session Stripe
+	const session = await stripe.checkout.sessions.create({
+		payment_method_types: ["card"],
+		line_items: lineItems,
+		mode: "payment",
+		success_url: successUrl,
+		cancel_url: cancelUrl,
+		billing_address_collection: "required",
+		shipping_address_collection: {
+			allowed_countries: ["FR", "BE", "LU", "CH", "IT", "ES", "DE", "NL"],
+		},
+		customer: user?.stripeCustomerId || undefined,
+		customer_creation: user?.stripeCustomerId ? undefined : "always",
+		customer_email: user?.stripeCustomerId
+			? undefined
+			: user?.email || guestEmail,
+		metadata: {
+			orderId: order.id,
+			userId: user?.id || "",
+			isGuest: user ? "false" : "true",
+		},
+	});
+
+	// Mettre à jour la commande avec l'ID de la session Stripe
+	await prisma.order.update({
+		where: { id: order.id },
+		data: {
+			stripeCheckoutSession: session.id,
+			paymentStatus: "PENDING",
+		},
+	});
+
+	return session;
 }
