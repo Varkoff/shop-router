@@ -1,8 +1,8 @@
 import { getFormProps, getInputProps, getSelectProps, getTextareaProps, useForm } from '@conform-to/react';
 import { parseWithZod } from '@conform-to/zod';
-import { ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { ExternalLink, Image as ImageIcon, Zap } from 'lucide-react';
 import { useState } from 'react';
-import { data, Form, Link, redirect, useNavigation } from 'react-router';
+import { data, Form, Link, redirect, useFetcher, useNavigation } from 'react-router';
 import { z } from 'zod';
 import {
     ErrorList,
@@ -26,6 +26,7 @@ import { requireAdmin } from '~/server/auth.server';
 import { linkImagesToProduct, unlinkImageFromProduct } from '~/server/db.server';
 import { getProduct } from '~/server/products.server';
 import { listS3Objects } from '~/server/s3.server';
+import { syncProductWithStripe } from '~/server/stripe.server';
 import type { Route } from './+types/products.$productSlug';
 
 const ProductSchema = z.object({
@@ -52,10 +53,16 @@ const UnlinkImageSchema = z.object({
     imageUrl: z.string().url(),
 });
 
+const SyncStripeSchema = z.object({
+    intent: z.literal('sync-stripe'),
+    productId: z.string().uuid(),
+});
+
 export const ActionSchema = z.discriminatedUnion('intent', [
     ProductSchema,
     LinkImagesSchema,
     UnlinkImageSchema,
+    SyncStripeSchema,
 ]);
 
 
@@ -143,6 +150,39 @@ export async function action({ request, params }: Route.ActionArgs) {
             }
         }
 
+        case 'sync-stripe': {
+            try {
+                const result = await syncProductWithStripe(submission.value.productId);
+                let message = '';
+
+                switch (result.action) {
+                    case 'created':
+                        message = 'Produit créé sur Stripe avec succès !';
+                        break;
+                    case 'linked':
+                        message = 'Produit lié à un produit Stripe existant !';
+                        break;
+                    case 'updated':
+                        message = 'Produit mis à jour sur Stripe !';
+                        break;
+                }
+
+                return data({
+                    result: submission.reply(),
+                    success: message
+                });
+            } catch (error) {
+                return data(
+                    {
+                        result: submission.reply({
+                            formErrors: [error instanceof Error ? error.message : 'Erreur lors de la synchronisation avec Stripe'],
+                        }),
+                    },
+                    { status: 500 }
+                );
+            }
+        }
+
         case 'update-product': {
             // Validate slug uniqueness for product updates
             const slugValidation = await parseWithZod(formData, {
@@ -211,6 +251,7 @@ export default function ProductForm({
     const successMessage = actionData && 'success' in actionData ? actionData.success as string : undefined;
 
     const [content, setContent] = useState(product?.content || '');
+    const fetcher = useFetcher<typeof action>();
 
     const [form, fields] = useForm({
         lastResult,
@@ -244,14 +285,27 @@ export default function ProductForm({
                             {isCreating ? 'Créer un produit' : `Modifier ${product?.name}`}
                         </CardTitle>
                         {!isCreating && product && (
-                            <Button variant="outline" size="sm" asChild className='h-fit'>
-                                <Link to={`/products/${product.slug}`} target="_blank"
-
-                                    className='flex items-center gap-2'>
-                                    <ExternalLink className="size-4 shrink-0 mr-2" />
-                                    <span>Voir la page publique</span>
-                                </Link>
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button variant="outline" asChild className='h-fit'>
+                                    <Link to={`/products/${product.slug}`} target="_blank"
+                                        className='flex items-center gap-2'>
+                                        <ExternalLink className="size-4 shrink-0 mr-2" />
+                                        <span>Voir la page publique</span>
+                                    </Link>
+                                </Button>
+                                <fetcher.Form method="POST" className="inline">
+                                    <input type="hidden" name="intent" value="sync-stripe" />
+                                    <input type="hidden" name="productId" value={product.id} />
+                                    <Button
+                                        type="submit"
+                                        disabled={fetcher.state === 'submitting'}
+                                        isLoading={fetcher.state === 'submitting'}
+                                    >
+                                        <Zap className="size-4 shrink-0" />
+                                        <span>Synchroniser avec Stripe</span>
+                                    </Button>
+                                </fetcher.Form>
+                            </div>
                         )}
                     </div>
                 </CardHeader>

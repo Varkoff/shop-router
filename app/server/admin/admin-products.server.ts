@@ -1,4 +1,5 @@
 import { prisma } from "../db.server";
+import { deleteStripeProduct, updateStripeProduct } from "../stripe.server";
 
 type ProductData = {
 	name: string;
@@ -126,10 +127,38 @@ export async function updateProduct({
 			slug: true,
 		},
 	});
+
+	// Update Stripe product if it exists
+	try {
+		await updateStripeProduct(updatedProduct.id);
+	} catch (error) {
+		// Log error but don't fail the update
+		console.error("Failed to update Stripe product:", error);
+	}
+
 	return { ...updatedProduct, hasUpdatedSlug };
 }
 
 export async function deleteProduct(productSlug: string) {
+	// Get product ID first for Stripe cleanup
+	const product = await prisma.product.findUnique({
+		where: { slug: productSlug },
+		select: { id: true },
+	});
+
+	if (!product) {
+		throw new Error("Product not found");
+	}
+
+	// Delete from Stripe first (if it exists)
+	try {
+		await deleteStripeProduct(product.id);
+	} catch (error) {
+		// Log error but don't fail the deletion
+		console.error("Failed to delete Stripe product:", error);
+	}
+
+	// Then delete from database
 	return await prisma.product.delete({
 		where: { slug: productSlug },
 	});
@@ -159,4 +188,24 @@ export async function isSlugTaken({ slug }: { slug: string }) {
 	});
 
 	return Boolean(existingProduct);
+}
+
+export async function adminGetProduct({ productId }: { productId: string }) {
+	return await prisma.product.findUnique({
+		where: { id: productId },
+		select: {
+			id: true,
+			name: true,
+			description: true,
+			priceCents: true,
+			currency: true,
+			stripeProductId: true,
+			stripePriceId: true,
+			images: {
+				select: {
+					url: true,
+				},
+			},
+		},
+	});
 }
