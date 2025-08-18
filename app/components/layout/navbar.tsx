@@ -1,6 +1,7 @@
 import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { ClientOnly } from 'remix-utils/client-only';
 import { useCartContext } from '~/contexts/cart-context';
 import { signOut } from '~/lib/auth-client';
 import { useOptionalUser } from '~/root';
@@ -58,103 +59,107 @@ export function Navbar() {
 
                     {/* Right Side Actions */}
                     <div className='flex items-center space-x-4'>
-                        {/* Cart Icon with Hover Card */}
-                        <HoverCard openDelay={100} closeDelay={200}>
-                            <HoverCardTrigger asChild>
-                                <Link
-                                    to="/cart"
-                                    className='relative p-2 text-gray-600 hover:text-black transition-colors duration-200 block'
-                                    aria-label='Panier'
-                                >
-                                    <ShoppingCart className="w-6 h-6" />
-                                    {getTotalItems() > 0 && (
-                                        <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
-                                            {getTotalItems()}
-                                        </span>
-                                    )}
-                                </Link>
-                            </HoverCardTrigger>
+                        <ClientOnly>
+                            {() =>
 
-                            {getTotalItems() > 0 && (
-                                <HoverCardContent className="w-80 p-0" align="end" side="bottom">
-                                    <div className="p-4">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <h3 className="font-medium text-gray-900">Panier</h3>
-                                            <span className="text-sm text-gray-500">{getTotalItems()} article{getTotalItems() > 1 ? 's' : ''}</span>
-                                        </div>
-
-                                        <div className="space-y-3 max-h-64 overflow-y-auto">
-                                            {cart.items.slice(0, 3).map((item) => (
-                                                <div key={item.product.id} className="flex items-center gap-3">
-                                                    <div
-                                                        className="w-12 h-12 bg-gray-100 rounded-lg bg-cover bg-center flex-shrink-0"
-                                                        style={{ backgroundImage: `url(${item.product.imageUrl})` }}
-                                                    />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium text-gray-900 truncate">
-                                                            {item.product.name}
-                                                        </p>
-                                                        <p className="text-sm text-gray-500">
-                                                            {(item.product.priceCents / 100).toLocaleString('fr-FR')}€
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                                                            className="h-6 w-6 p-0"
-                                                        >
-                                                            <Minus className="h-3 w-3" />
-                                                        </Button>
-                                                        <span className="text-sm font-medium w-6 text-center">
-                                                            {item.quantity}
-                                                        </span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                                                            className="h-6 w-6 p-0"
-                                                        >
-                                                            <Plus className="h-3 w-3" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => removeFromCart(item.product.id)}
-                                                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                                        >
-                                                            <Trash2 className="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {cart.items.length > 3 && (
-                                                <div className="text-center text-sm text-gray-500">
-                                                    et {cart.items.length - 3} autre{cart.items.length - 3 > 1 ? 's' : ''} article{cart.items.length - 3 > 1 ? 's' : ''}...
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <Separator className="my-3" />
-
-                                        <div className="flex items-center justify-between mb-3">
-                                            <span className="font-medium text-gray-900">Total</span>
-                                            <span className="font-medium text-gray-900">
-                                                {(getTotalPrice() / 100).toLocaleString('fr-FR')}€
-                                            </span>
-                                        </div>
-
+                                <HoverCard openDelay={100} closeDelay={200}>
+                                    <HoverCardTrigger asChild>
                                         <Link
                                             to="/cart"
-                                            className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 font-medium text-sm transition-colors"
+                                            className='relative p-2 text-gray-600 hover:text-black transition-colors duration-200 block'
+                                            aria-label='Panier'
                                         >
-                                            Voir le panier
+                                            <ShoppingCart className="w-6 h-6" />
+                                            {getTotalItems() > 0 && (
+                                                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                                                    {getTotalItems()}
+                                                </span>
+                                            )}
                                         </Link>
-                                    </div>
-                                </HoverCardContent>
-                            )}
-                        </HoverCard>
+                                    </HoverCardTrigger>
+
+                                    {getTotalItems() > 0 && (
+                                        <HoverCardContent className="w-80 p-0" align="end" side="bottom">
+                                            <div className="p-4">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <h3 className="font-medium text-gray-900">Panier</h3>
+                                                    <span className="text-sm text-gray-500">{getTotalItems()} article{getTotalItems() > 1 ? 's' : ''}</span>
+                                                </div>
+
+                                                <div className="space-y-3 max-h-64 overflow-y-auto">
+                                                    {cart.items.slice(0, 3).map((item) => (
+                                                        <div key={item.product.id} className="flex items-center gap-3">
+                                                            <div
+                                                                className="w-12 h-12 bg-gray-100 rounded-lg bg-cover bg-center flex-shrink-0"
+                                                                style={{ backgroundImage: `url(${item.product.imageUrl})` }}
+                                                            />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-medium text-gray-900 truncate">
+                                                                    {item.product.name}
+                                                                </p>
+                                                                <p className="text-sm text-gray-500">
+                                                                    {(item.product.priceCents / 100).toLocaleString('fr-FR')}€
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                                                                    className="h-6 w-6 p-0"
+                                                                >
+                                                                    <Minus className="h-3 w-3" />
+                                                                </Button>
+                                                                <span className="text-sm font-medium w-6 text-center">
+                                                                    {item.quantity}
+                                                                </span>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                                                                    className="h-6 w-6 p-0"
+                                                                >
+                                                                    <Plus className="h-3 w-3" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => removeFromCart(item.product.id)}
+                                                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                                                >
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {cart.items.length > 3 && (
+                                                        <div className="text-center text-sm text-gray-500">
+                                                            et {cart.items.length - 3} autre{cart.items.length - 3 > 1 ? 's' : ''} article{cart.items.length - 3 > 1 ? 's' : ''}...
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <Separator className="my-3" />
+
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <span className="font-medium text-gray-900">Total</span>
+                                                    <span className="font-medium text-gray-900">
+                                                        {(getTotalPrice() / 100).toLocaleString('fr-FR')}€
+                                                    </span>
+                                                </div>
+
+                                                <Link
+                                                    to="/cart"
+                                                    className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 font-medium text-sm transition-colors"
+                                                >
+                                                    Voir le panier
+                                                </Link>
+                                            </div>
+                                        </HoverCardContent>
+                                    )}
+                                </HoverCard>}
+                        </ClientOnly>
+
                     </div>
 
                     {/* Auth Buttons */}
