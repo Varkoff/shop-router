@@ -1,5 +1,5 @@
 import { ProductCard } from "~/components/products/product-card"
-import type { getProducts } from "~/server/products.server"
+import type { getProducts } from "~/server/customer/products.server"
 
 export const ProductList = ({ products }: {
     products: Awaited<ReturnType<typeof getProducts>>

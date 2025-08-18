@@ -23,8 +23,8 @@ import {
     updateProduct,
 } from '~/server/admin/admin-products.server';
 import { requireAdmin } from '~/server/auth.server';
+import { getProduct } from '~/server/customer/products.server';
 import { linkImagesToProduct, unlinkImageFromProduct } from '~/server/db.server';
-import { getProduct } from '~/server/products.server';
 import { listS3Objects } from '~/server/s3.server';
 import { syncProductWithStripe } from '~/server/stripe.server';
 import type { Route } from './+types/products.$productSlug';

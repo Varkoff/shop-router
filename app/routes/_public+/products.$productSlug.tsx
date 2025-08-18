@@ -9,7 +9,7 @@ import { Button, buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { useCartContext } from "~/contexts/cart-context";
-import { getProduct } from "~/server/products.server";
+import { getProduct } from "~/server/customer/products.server";
 import type { Route } from "./+types/products.$productSlug";
 export async function loader({ params }: Route.LoaderArgs) {
     const productData = await getProduct({
@@ -284,10 +284,10 @@ export default function ProductDetails() {
                                                 to="/cart"
                                                 className={buttonVariants({
                                                     size: "lg",
-                                                    className: "w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-lg py-6 rounded-full font-medium shadow-lg"
+                                                    className: "w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-medium"
                                                 })}
                                             >
-                                                <ShoppingCart className="h-5 w-5 mr-3" />
+                                                <ShoppingCart className="h-4 w-4 mr-2" />
                                                 Voir le panier
                                             </Link>
                                         </div>
@@ -296,9 +296,9 @@ export default function ProductDetails() {
                                             size="lg"
                                             onClick={handleAddToCart}
                                             disabled={!isInStock || !product.isActive}
-                                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg py-6 rounded-full font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            <ShoppingCart className="h-5 w-5 mr-3" />
+                                            <ShoppingCart className="h-4 w-4 mr-2" />
                                             {isInStock && product.isActive
                                                 ? 'Ajouter au panier'
                                                 : 'Non disponible'

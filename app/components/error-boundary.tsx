@@ -40,7 +40,7 @@ const NotFoundPage = () => (
                 <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
                     <Button
                         size="lg"
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg px-12 py-6 rounded-full font-medium shadow-lg"
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-lg px-12 py-4 font-medium"
                         onClick={() => window.history.back()}
                     >
                         Retour
@@ -48,7 +48,7 @@ const NotFoundPage = () => (
                     <Button
                         size="lg"
                         variant="outline"
-                        className="text-lg px-12 py-6 rounded-full font-medium border-gray-300 hover:bg-gray-50"
+                        className="text-lg px-12 py-4 font-medium border-gray-300 hover:bg-gray-50"
                         onClick={() => window.location.href = '/'}
                     >
                         Accueil

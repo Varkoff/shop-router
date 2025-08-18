@@ -4,7 +4,7 @@ import { ProductList } from "~/components/products/product-list"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select"
-import { getProducts } from "~/server/products.server"
+import { getProducts } from "~/server/customer/products.server"
 
 export async function loader() {
   return await getProducts()

@@ -26,7 +26,7 @@ export default function Home() {
           <div className="flex justify-center mb-16">
             <Button
               size="lg"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg px-12 py-6 rounded-full font-medium shadow-lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-lg px-12 py-4 font-medium"
             >
               Découvrir nos modèles
             </Button>

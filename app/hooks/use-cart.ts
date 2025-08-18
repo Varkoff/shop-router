@@ -1,38 +1,85 @@
+import { useMemo } from "react";
 import { useFetcher } from "react-router";
 import { useLocalStorage } from "usehooks-ts";
-import { useOptionalUser, useUserCart } from "~/root";
-import type { getProducts } from "~/server/products.server";
+import { useOptionalUser, useProducts, useUserCart } from "~/root";
+import type { getProducts } from "~/server/customer/products.server";
 
 // Type du produit inféré depuis le serveur
 type Product = Awaited<ReturnType<typeof getProducts>>[number];
 
-// Type d'un item du panier
-type CartItem = {
+// Type d'un item du panier (localStorage) - minimal
+export type CartItemStorage = {
+	productId: string;
+	quantity: number;
+};
+
+// Type du panier (localStorage) - minimal
+export type CartStorage = {
+	items: CartItemStorage[];
+};
+
+// Type d'un item du panier enrichi (pour l'UI)
+export type CartItem = {
 	product: Product;
 	quantity: number;
 };
 
-// Type du panier
-type Cart = {
+// Type du panier enrichi (pour l'UI)
+export type Cart = {
 	items: CartItem[];
 };
 
 export const useCart = () => {
 	const user = useOptionalUser();
 	const userCart = useUserCart();
+	const products = useProducts();
 	const isAuthenticated = !!user;
 	const fetcher = useFetcher();
 
-	const [cart, setCart] = useLocalStorage<Cart>("cart", {
-		items: userCart.items,
+	// localStorage contient seulement productId + quantity
+	const [cartStorage, setCartStorage] = useLocalStorage<CartStorage>("cart", {
+		items: userCart.items.map((item) => ({
+			productId: item.product.id,
+			quantity: item.quantity,
+		})),
 	});
+
+	// Enrichir le panier avec les données serveur
+	const cart: Cart = useMemo(() => {
+		const enrichedItems: CartItem[] = [];
+
+		// Créer une map des produits pour un accès plus rapide
+		// Priorité : panier utilisateur connecté, sinon tous les produits
+		const allProducts =
+			isAuthenticated && userCart.items.length > 0
+				? userCart.items.map((item) => item.product)
+				: products;
+
+		const productsMap = new Map(
+			allProducts.map((product) => [product.id, product]),
+		);
+
+		for (const storageItem of cartStorage.items) {
+			// Chercher le produit dans les données serveur
+			const serverProduct = productsMap.get(storageItem.productId);
+
+			if (serverProduct) {
+				enrichedItems.push({
+					product: serverProduct,
+					quantity: storageItem.quantity,
+				});
+			}
+		}
+
+		return { items: enrichedItems };
+	}, [cartStorage, userCart, products, isAuthenticated]);
 
 	// Ajouter un produit au panier
 	const addToCart = (product: Product, quantity: number = 1) => {
 		console.log("addToCart", product, quantity);
-		setCart((currentCart) => {
+		setCartStorage((currentCart) => {
 			const existingItemIndex = currentCart.items.findIndex(
-				(item) => item.product.id === product.id,
+				(item) => item.productId === product.id,
 			);
 
 			if (existingItemIndex >= 0) {
@@ -46,7 +93,7 @@ export const useCart = () => {
 			} else {
 				// Nouveau produit
 				return {
-					items: [...currentCart.items, { product, quantity }],
+					items: [...currentCart.items, { productId: product.id, quantity }],
 				};
 			}
 		});
@@ -66,8 +113,8 @@ export const useCart = () => {
 
 	// Retirer un produit du panier
 	const removeFromCart = (productId: string) => {
-		setCart((currentCart) => ({
-			items: currentCart.items.filter((item) => item.product.id !== productId),
+		setCartStorage((currentCart) => ({
+			items: currentCart.items.filter((item) => item.productId !== productId),
 		}));
 
 		// Synchroniser avec le serveur
@@ -89,9 +136,9 @@ export const useCart = () => {
 			return;
 		}
 
-		setCart((currentCart) => {
+		setCartStorage((currentCart) => {
 			const newItems = currentCart.items.map((item) =>
-				item.product.id === productId ? { ...item, quantity } : item,
+				item.productId === productId ? { ...item, quantity } : item,
 			);
 			return { items: newItems };
 		});
@@ -109,12 +156,16 @@ export const useCart = () => {
 		}
 	};
 
+	type ClearCartProps = { disableAuthenticatedClearCart?: boolean };
 	// Vider le panier
-	const clearCart = () => {
-		setCart({ items: [] });
+	const clearCart = ({
+		disableAuthenticatedClearCart = false,
+	}: ClearCartProps = {}) => {
+		if (cart.items.length === 0) return;
+		setCartStorage({ items: [] });
 
 		// Synchroniser avec le serveur
-		if (isAuthenticated) {
+		if (isAuthenticated && !disableAuthenticatedClearCart) {
 			const formData = new FormData();
 			formData.set("intent", "clear-cart");
 			fetcher.submit(formData, {
@@ -138,12 +189,12 @@ export const useCart = () => {
 
 	// Vérifier si un produit est dans le panier
 	const isInCart = (productId: string) => {
-		return cart.items.some((item) => item.product.id === productId);
+		return cartStorage.items.some((item) => item.productId === productId);
 	};
 
 	// Obtenir la quantité d'un produit dans le panier
 	const getItemQuantity = (productId: string) => {
-		const item = cart.items.find((item) => item.product.id === productId);
+		const item = cartStorage.items.find((item) => item.productId === productId);
 		return item?.quantity || 0;
 	};
 

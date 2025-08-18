@@ -68,7 +68,7 @@ export function Navbar() {
                                 >
                                     <ShoppingCart className="w-6 h-6" />
                                     {getTotalItems() > 0 && (
-                                        <span className="absolute -top-1 -right-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                                        <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
                                             {getTotalItems()}
                                         </span>
                                     )}
@@ -147,7 +147,7 @@ export function Navbar() {
 
                                         <Link
                                             to="/cart"
-                                            className="block w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-center py-2 rounded-full font-medium text-sm transition-colors"
+                                            className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 font-medium text-sm transition-colors"
                                         >
                                             Voir le panier
                                         </Link>
@@ -204,7 +204,7 @@ export function Navbar() {
                                     className={buttonVariants({
                                         size: 'sm',
                                         className:
-                                            'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-full px-6',
+                                            'bg-blue-600 hover:bg-blue-700 text-white font-medium px-6',
                                     })}
                                 >
                                     S'inscrire
@@ -286,7 +286,7 @@ export function Navbar() {
                             >
                                 Panier
                                 {getTotalItems() > 0 && (
-                                    <span className="ml-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm rounded-full h-6 w-6 flex items-center justify-center font-medium">
+                                    <span className="ml-2 bg-blue-600 text-white text-sm rounded-full h-6 w-6 flex items-center justify-center font-medium">
                                         {getTotalItems()}
                                     </span>
                                 )}
@@ -345,7 +345,7 @@ export function Navbar() {
                                         to='/register'
                                         className={buttonVariants({
                                             size: 'lg',
-                                            className: 'w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-full py-4 text-xl',
+                                            className: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-4 text-xl',
                                         })}
                                         onClick={() => setIsMobileMenuOpen(false)}
                                     >
