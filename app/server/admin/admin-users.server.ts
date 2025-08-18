@@ -12,7 +12,7 @@ import {
 	getAllUsersWithRoles,
 	getUserWithRole,
 	updateUserRole,
-} from "../roles.server";
+} from "./roles.server";
 
 interface BetterAuthError extends Error {
 	body?: {

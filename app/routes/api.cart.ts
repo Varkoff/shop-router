@@ -7,7 +7,7 @@ import {
 	clearCart,
 	removeFromCart,
 	updateCartQuantity,
-} from "~/server/cart.server";
+} from "~/server/customer/cart.server";
 import type { Route } from "./+types/api.cart";
 
 // Schémas Zod pour les actions du panier

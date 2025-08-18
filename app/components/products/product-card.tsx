@@ -4,7 +4,7 @@ import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
 
 import { cn } from '~/lib/utils';
-import type { getProducts } from '~/server/products.server';
+import type { getProducts } from '~/server/customer/products.server';
 
 export const ProductCard = ({
     product,
@@ -62,7 +62,7 @@ export const ProductCard = ({
                         À partir de {(product.priceCents / 100).toLocaleString('fr-FR')}€
                     </div>
                     <Button
-                        className='bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full px-4 md:px-6 py-2 relative z-20 font-medium text-sm'
+                        className='bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2 relative z-20 font-medium text-sm'
                         size='sm'
                         onClick={(e) => {
                             e.preventDefault();

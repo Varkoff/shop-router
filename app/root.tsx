@@ -13,7 +13,8 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { GeneralErrorBoundary } from "./components/error-boundary";
 import { getOptionalUser } from "./server/auth.server";
-import { getUserCart } from "./server/cart.server";
+import { getUserCart } from "./server/customer/cart.server";
+import { getProducts } from "./server/customer/products.server";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -35,7 +36,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Récupérer le panier utilisateur s'il est connecté
   const userCart = user ? await getUserCart(user.id) : { items: [] };
 
-  return data({ user, userCart });
+  // Récupérer tous les produits pour enrichir le panier localStorage
+  const products = await getProducts();
+
+  return data({ user, userCart, products });
 }
 
 export function useOptionalUser() {
@@ -44,6 +48,10 @@ export function useOptionalUser() {
 
 export function useUserCart() {
   return useRouteLoaderData<typeof loader>("root")?.userCart || { items: [] };
+}
+
+export function useProducts() {
+  return useRouteLoaderData<typeof loader>("root")?.products || [];
 }
 
 export function useUser() {

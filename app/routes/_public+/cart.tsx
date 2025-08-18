@@ -1,203 +1,129 @@
-import { Minus, Plus, ShoppingCart, Trash2, X } from 'lucide-react'
-import { Link } from 'react-router'
-import { Button } from '~/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
-import { useCartContext } from '~/contexts/cart-context'
+import { parseWithZod } from '@conform-to/zod';
+import { data, redirect } from 'react-router';
+import { z } from 'zod';
+import { CartHeader, CartItem, EmptyCart, OrderSummary } from '~/components/cart';
+import { useCartContext } from '~/contexts/cart-context';
+import { useCart } from '~/hooks/use-cart';
+import { getOptionalUser } from '~/server/auth.server';
+import { clearCart } from '~/server/customer/cart.server';
+import { createOrder } from '~/server/customer/orders.server';
+import type { Route } from './+types/cart';
+
+
+// Schéma Zod pour les items de commande
+const CartItemSchema = z.object({
+    productId: z.string().min(1, 'Product ID is required'),
+    quantity: z.coerce.number().int().positive('Quantity must be positive'),
+});
+
+// Schéma Zod pour la création de commande
+export const CreateOrderSchema = z.object({
+    intent: z.literal('create-order'),
+    items: z.array(CartItemSchema).min(1, 'Votre panier est vide'),
+    guestEmail: z.string().email('Email invalide').optional(),
+});
+
+export async function action({ request }: Route.ActionArgs) {
+    const user = await getOptionalUser(request);
+    const formData = await request.formData();
+
+    const submission = parseWithZod(formData, {
+        schema: CreateOrderSchema.superRefine((data, ctx) => {
+            if (!user && !data.guestEmail) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: 'Email requis pour les commandes sans compte',
+                });
+            }
+        }),
+    });
+
+    if (submission.status !== 'success') {
+        return data({ result: submission.reply() }, { status: 400 });
+    }
+
+    const { guestEmail } = submission.value;
+    try {
+        // Créer la commande avec les items du panier
+        const order = await createOrder({
+            cartData: submission.value,
+            userId: user?.id,
+        });
+
+        if (user) {
+            await clearCart({ userId: user.id });
+        }
+
+        // Rediriger vers la page de confirmation ou de paiement avec paramètre de succès
+        const redirectUrl = user
+            ? `/orders/${order.id}?success=true`
+            : `/orders/${order.id}?email=${encodeURIComponent(guestEmail || '')}&success=true`;
+        return redirect(redirectUrl);
+
+    } catch (error) {
+        console.error('Order creation error:', error);
+
+        if (error instanceof Error) {
+            return data({
+                result: submission.reply({
+                    formErrors: [error.message]
+                })
+            }, { status: 400 });
+        }
+
+        return data({
+            result: submission.reply({
+                formErrors: ['Erreur lors de la création de la commande']
+            })
+        }, { status: 500 });
+    }
+}
 
 export default function CartRoute() {
     const {
         cart,
         removeFromCart,
         updateQuantity,
-        clearCart,
         getTotalPrice,
         getTotalItems
     } = useCartContext()
 
+    const { clearCart } = useCart()
+
     if (cart.items.length === 0) {
-        return (
-            <div className="min-h-screen bg-white">
-                <main className="container mx-auto px-4 md:px-6 py-6 md:py-8">
-                    <div className="max-w-4xl mx-auto">
-                        <div className="text-center py-16">
-                            <ShoppingCart className="h-24 w-24 text-gray-300 mx-auto mb-6" />
-                            <h1 className="text-3xl font-light mb-4 text-gray-900">
-                                Votre panier est vide
-                            </h1>
-                            <p className="text-gray-600 mb-8 font-light">
-                                Découvrez notre collection de robots et ajoutez vos favoris
-                            </p>
-                            <Link to="/products">
-                                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-full font-medium">
-                                    Voir la collection
-                                </Button>
-                            </Link>
-                        </div>
-                    </div>
-                </main>
-            </div>
-        )
+        return <EmptyCart />
     }
 
     return (
         <div className="min-h-screen bg-white">
             <main className="container mx-auto px-4 md:px-6 py-6 md:py-8">
                 <div className="max-w-4xl mx-auto">
-
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-8">
-                        <div>
-                            <h1 className="text-3xl md:text-4xl font-light mb-2 tracking-tight">
-                                Panier
-                            </h1>
-                            <p className="text-gray-600 font-light">
-                                {getTotalItems()} article{getTotalItems() > 1 ? 's' : ''}
-                            </p>
-                        </div>
-                        <Button
-                            variant="outline"
-                            onClick={clearCart}
-                            className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
-                        >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Vider le panier
-                        </Button>
-                    </div>
+                    <CartHeader
+                        totalItems={getTotalItems()}
+                        onClearCart={clearCart}
+                    />
 
                     <div className="grid lg:grid-cols-3 gap-8">
-
                         {/* Liste des articles */}
                         <div className="lg:col-span-2 space-y-4">
                             {cart.items.map((item) => (
-                                <Card key={item.product.id} className="overflow-hidden">
-                                    <CardContent className="p-4">
-                                        <div className="flex gap-4">
-
-                                            {/* Image du produit */}
-                                            <div className="flex-shrink-0">
-                                                <div
-                                                    className="w-20 h-20 bg-gray-100 rounded-lg bg-cover bg-center"
-                                                    style={{
-                                                        backgroundImage: `url(${item.product.imageUrl})`
-                                                    }}
-                                                />
-                                            </div>
-
-                                            {/* Informations du produit */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <h3 className="font-medium text-lg leading-tight">
-                                                            {item.product.name}
-                                                        </h3>
-                                                        <p className="text-gray-600 text-sm line-clamp-2 font-light">
-                                                            {item.product.description}
-                                                        </p>
-                                                    </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => removeFromCart(item.product.id)}
-                                                        className="text-gray-400 hover:text-red-600 p-1"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-
-                                                {/* Prix et contrôles quantité */}
-                                                <div className="flex items-center justify-between">
-                                                    <div className="text-lg font-medium">
-                                                        {(item.product.priceCents / 100).toLocaleString('fr-FR')}€
-                                                    </div>
-
-                                                    {/* Contrôles de quantité */}
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                                                            className="h-8 w-8 p-0"
-                                                        >
-                                                            <Minus className="h-3 w-3" />
-                                                        </Button>
-                                                        <span className="w-8 text-center font-medium">
-                                                            {item.quantity}
-                                                        </span>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                                                            className="h-8 w-8 p-0"
-                                                        >
-                                                            <Plus className="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+                                <CartItem
+                                    key={item.product.id}
+                                    item={item}
+                                    onRemove={removeFromCart}
+                                    onUpdateQuantity={updateQuantity}
+                                />
                             ))}
                         </div>
 
                         {/* Résumé de commande */}
                         <div className="lg:col-span-1">
-                            <Card className="sticky top-6">
-                                <CardHeader>
-                                    <CardTitle className="text-xl font-light">
-                                        Résumé de commande
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-
-                                    {/* Détail des prix */}
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-600">
-                                                Sous-total ({getTotalItems()} article{getTotalItems() > 1 ? 's' : ''})
-                                            </span>
-                                            <span>{(getTotalPrice() / 100).toLocaleString('fr-FR')}€</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-600">Livraison</span>
-                                            <span className="text-green-600">Gratuite</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="border-t pt-4">
-                                        <div className="flex justify-between text-lg font-medium">
-                                            <span>Total</span>
-                                            <span>{(getTotalPrice() / 100).toLocaleString('fr-FR')}€</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Boutons d'action */}
-                                    <div className="space-y-3 pt-4">
-                                        <Button
-                                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-full font-medium"
-                                            size="lg"
-                                        >
-                                            Commander maintenant
-                                        </Button>
-                                        <Link to="/products" className="block">
-                                            <Button
-                                                variant="outline"
-                                                className="w-full"
-                                                size="lg"
-                                            >
-                                                Continuer mes achats
-                                            </Button>
-                                        </Link>
-                                    </div>
-
-                                    {/* Informations supplémentaires */}
-                                    <div className="text-xs text-gray-500 space-y-1 pt-4 border-t">
-                                        <p>✓ Livraison gratuite</p>
-                                        <p>✓ Retour sous 30 jours</p>
-                                        <p>✓ Garantie 2 ans</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <OrderSummary
+                                key={JSON.stringify(cart)}
+                                totalItems={getTotalItems()}
+                                totalPrice={getTotalPrice()}
+                                cart={cart}
+                            />
                         </div>
                     </div>
                 </div>
