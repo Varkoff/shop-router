@@ -9,10 +9,10 @@ import { Button, buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { useCartContext } from "~/contexts/cart-context";
-import { getProduct } from "~/server/products.server";
+import { getProductBySlug } from "~/server/products.server";
 import type { Route } from "./+types/products.$productSlug";
 export async function loader({ params }: Route.LoaderArgs) {
-    const productData = await getProduct({
+    const productData = await getProductBySlug({
         productSlug: params.productSlug,
     })
     if (!productData.product) {
@@ -81,8 +81,8 @@ export function meta({ loaderData, location }: Route.MetaArgs) {
         }])
 }
 
-const formatPrice = (priceCents: number, currency = "EUR") => {
-    return new Intl.NumberFormat('fr-FR', {
+const formatPrice = (priceCents: number, currency = "USD") => {
+    return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: currency,
         minimumFractionDigits: 0

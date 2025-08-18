@@ -1,14 +1,13 @@
-import { getFormProps, getInputProps, getSelectProps, getTextareaProps, useForm } from '@conform-to/react';
+import { getFormProps, getInputProps, getTextareaProps, useForm } from '@conform-to/react';
 import { parseWithZod } from '@conform-to/zod';
-import { ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { CheckCircle, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { useState } from 'react';
-import { data, Form, Link, redirect, useNavigation } from 'react-router';
+import { data, Form, Link, redirect, useFetcher, useNavigation } from 'react-router';
 import { z } from 'zod';
 import {
     ErrorList,
     Field,
     PriceField,
-    SelectField,
     SwitchField
 } from '~/components/forms';
 import { ImageSelector } from '~/components/image-selector';
@@ -20,22 +19,23 @@ import { Label } from '~/components/ui/label';
 import {
     createProduct,
     isSlugTaken,
+    syncProductWithPolar,
     updateProduct,
 } from '~/server/admin/admin-products.server';
 import { requireAdmin } from '~/server/auth.server';
 import { linkImagesToProduct, unlinkImageFromProduct } from '~/server/db.server';
-import { getProduct } from '~/server/products.server';
+import { getProductBySlug } from '~/server/products.server';
 import { listS3Objects } from '~/server/s3.server';
 import type { Route } from './+types/products.$productSlug';
 
-const ProductSchema = z.object({
+export const ProductSchema = z.object({
     intent: z.literal('update-product'),
     name: z.string().min(1, 'Le nom est requis'),
     slug: z.string().min(1, 'Le slug est requis'),
     description: z.string().optional(),
     content: z.string().optional(),
     priceCents: z.coerce.number().min(0, 'Le prix doit être positif'),
-    currency: z.string().default('EUR'),
+    currency: z.string().default('USD'),
     stock: z.coerce.number().min(0, 'Le stock doit être positif'),
     isActive: z.boolean().default(false),
 });
@@ -52,10 +52,16 @@ const UnlinkImageSchema = z.object({
     imageUrl: z.string().url(),
 });
 
+const SyncPolarSchema = z.object({
+    intent: z.literal('sync-polar'),
+    productIdentifier: z.string().min(1),
+});
+
 export const ActionSchema = z.discriminatedUnion('intent', [
     ProductSchema,
     LinkImagesSchema,
     UnlinkImageSchema,
+    SyncPolarSchema,
 ]);
 
 
@@ -65,7 +71,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     const isCreating = params.productSlug === 'new';
 
     const [productResult, s3Result] = await Promise.all([
-        isCreating ? { product: null } : getProduct({ productSlug: params.productSlug }),
+        isCreating ? { product: null } : getProductBySlug({ productSlug: params.productSlug }),
         listS3Objects(),
     ]);
 
@@ -143,6 +149,39 @@ export async function action({ request, params }: Route.ActionArgs) {
             }
         }
 
+        case 'sync-polar': {
+            try {
+                const syncResult = await syncProductWithPolar({
+                    productIdentifier: submission.value.productIdentifier,
+                });
+
+                if (!syncResult.success) {
+                    return data(
+                        {
+                            result: submission.reply({
+                                formErrors: [syncResult.error || 'Erreur lors de la synchronisation avec Polar'],
+                            }),
+                        },
+                        { status: 500 }
+                    );
+                }
+
+                return data({
+                    result: submission.reply(),
+                    success: syncResult.message
+                });
+            } catch (error) {
+                return data(
+                    {
+                        result: submission.reply({
+                            formErrors: [error instanceof Error ? error.message : 'Erreur lors de la synchronisation avec Polar'],
+                        }),
+                    },
+                    { status: 500 }
+                );
+            }
+        }
+
         case 'update-product': {
             // Validate slug uniqueness for product updates
             const slugValidation = await parseWithZod(formData, {
@@ -168,15 +207,13 @@ export async function action({ request, params }: Route.ActionArgs) {
 
             try {
                 if (isCreating) {
-                    const { intent: _, ...productData } = submission.value;
-                    const newProduct = await createProduct({ data: productData });
+                    const newProduct = await createProduct({ data: submission.value });
                     return redirect(`/admin/products/${newProduct.slug}`);
                 }
 
-                const { intent: _, ...productData } = submission.value;
                 const updatedProduct = await updateProduct({
                     productSlug: productSlug,
-                    data: productData,
+                    data: submission.value,
                 });
 
                 if (updatedProduct.hasUpdatedSlug) {
@@ -202,6 +239,68 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 }
 
+type ProductType = NonNullable<Awaited<ReturnType<typeof import('~/server/products.server').getProductBySlug>>['product']>;
+
+const PolarSyncButton = ({ product }: { product: ProductType }) => {
+    const syncFetcher = useFetcher();
+    const isSyncing = syncFetcher.state === 'submitting';
+
+    const handleSync = () => {
+        const formData = new FormData();
+        formData.set('intent', 'sync-polar');
+        formData.set('productIdentifier', product.id);
+        syncFetcher.submit(formData, { method: 'POST' });
+    };
+
+    return (
+        <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
+            <div className="flex items-center justify-between">
+                <div>
+                    <Label className="text-base font-medium">Synchronisation Polar</Label>
+                    <p className="text-sm text-gray-600 mt-1">
+                        Synchronisez ce produit avec votre organisation Polar pour activer les paiements.
+                    </p>
+                </div>
+                <Button
+                    type="button"
+                    onClick={handleSync}
+                    variant={product.polarProductId ? "secondary" : "default"}
+                    size="sm"
+                    disabled={isSyncing}
+                >
+                    {isSyncing
+                        ? 'Synchronisation...'
+                        : product.polarProductId
+                            ? 'Mettre à jour sur Polar'
+                            : 'Synchroniser avec Polar'
+                    }
+                </Button>
+            </div>
+
+            {product.polarProductId && (
+                <div className="flex items-center gap-2 text-sm text-green-700">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>
+                        Produit synchronisé (ID: {product.polarProductId.slice(0, 8)}...)
+                    </span>
+                </div>
+            )}
+
+            {syncFetcher.data?.success && (
+                <div className="text-sm text-green-700 bg-green-50 p-2 rounded">
+                    {syncFetcher.data.success}
+                </div>
+            )}
+
+            {syncFetcher.data?.result?.formErrors && (
+                <div className="text-sm text-red-700 bg-red-50 p-2 rounded">
+                    {syncFetcher.data.result.formErrors.join(', ')}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function ProductForm({
     loaderData,
     actionData,
@@ -225,7 +324,7 @@ export default function ProductForm({
             description: product?.description || '',
             content: product?.content || '',
             priceCents: product?.priceCents || 0,
-            currency: product?.currency || 'EUR',
+            currency: 'USD', // Forcé en USD car Polar n'accepte que cette devise
             stock: product?.stock || 0,
             isActive: product?.isActive || false,
         },
@@ -313,9 +412,9 @@ export default function ProductForm({
                             errors={fields.content.errors}
                         />
 
-                        <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+                        <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                             <PriceField
-                                labelProps={{ children: 'Prix (en centimes)' }}
+                                labelProps={{ children: 'Prix en USD (en centimes)' }}
                                 inputProps={{
                                     ...getInputProps(fields.priceCents, {
                                         type: 'number',
@@ -324,24 +423,6 @@ export default function ProductForm({
                                     }),
                                 }}
                                 errors={fields.priceCents.errors}
-                            />
-
-                            <SelectField
-                                labelProps={{ children: 'Devise' }}
-
-                                selectProps={{
-                                    ...getSelectProps(fields.currency),
-                                    defaultValue: fields.currency.initialValue,
-                                }}
-                                placeholder="Sélectionner une devise"
-                                options={[
-                                    { value: 'EUR', label: '€ Euro' },
-                                    { value: 'USD', label: '$ Dollar américain' },
-                                    { value: 'GBP', label: '£ Livre sterling' },
-                                    { value: 'CHF', label: '₣ Franc suisse' },
-                                    { value: 'CAD', label: '$ Dollar canadien' },
-                                ]}
-                                errors={fields.currency.errors}
                             />
 
                             <Field
@@ -357,6 +438,13 @@ export default function ProductForm({
                             />
                         </div>
 
+                        {/* Devise forcée en USD */}
+                        <input type="hidden" name="currency" value="USD" />
+
+                        <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+                            💡 <strong>Devise:</strong> Tous les prix sont en USD (dollars américains) car requis par Polar pour les paiements.
+                        </div>
+
                         <SwitchField
                             labelProps={{ children: 'Produit actif' }}
                             switchProps={{
@@ -367,58 +455,63 @@ export default function ProductForm({
                         />
 
                         {!isCreating && product && (
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <Label>Images du produit</Label>
-                                    <div className="flex gap-2">
-                                        <ImageSelector
-                                            images={images}
-                                            productId={product.id}
-                                            selectedImages={product.images?.map(img => ({
-                                                key: img.url,
-                                                url: img.url,
-                                                name: img.alt || 'Image',
-                                                size: 0,
-                                                lastModified: new Date()
-                                            })) || []}
-                                            trigger={
-                                                <Button type="button" variant="outline" size="sm" className="gap-2">
-                                                    <ImageIcon className="w-4 h-4" />
-                                                    Choisir des images
-                                                </Button>
-                                            }
-                                        />
-                                    </div>
-                                </div>
+                            <>
+                                {/* Polar Synchronization Section */}
+                                <PolarSyncButton product={product} />
 
-                                {product.images && product.images.length > 0 && (
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        {product.images.map((image, index) => (
-                                            <div key={image.id} className="space-y-2">
-                                                <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 border">
-                                                    <img
-                                                        src={image.url}
-                                                        alt={image.alt || `Image ${index + 1}`}
-                                                        className="w-full h-full object-cover"
-                                                    />
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <Label>Images du produit</Label>
+                                        <div className="flex gap-2">
+                                            <ImageSelector
+                                                images={images}
+                                                productId={product.id}
+                                                selectedImages={product.images?.map(img => ({
+                                                    key: img.url,
+                                                    url: img.url,
+                                                    name: img.alt || 'Image',
+                                                    size: 0,
+                                                    lastModified: new Date()
+                                                })) || []}
+                                                trigger={
+                                                    <Button type="button" variant="outline" size="sm" className="gap-2">
+                                                        <ImageIcon className="w-4 h-4" />
+                                                        Choisir des images
+                                                    </Button>
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {product.images && product.images.length > 0 && (
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            {product.images.map((image, index) => (
+                                                <div key={image.id} className="space-y-2">
+                                                    <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 border">
+                                                        <img
+                                                            src={image.url}
+                                                            alt={image.alt || `Image ${index + 1}`}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground text-center truncate">
+                                                        {image.alt || `Image ${index + 1}`}
+                                                    </p>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground text-center truncate">
-                                                    {image.alt || `Image ${index + 1}`}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            ))}
+                                        </div>
+                                    )}
 
-                                {(!product.images || product.images.length === 0) && (
-                                    <div className="text-center py-8 border border-dashed rounded-lg">
-                                        <ImageIcon className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                                        <p className="text-sm text-muted-foreground">
-                                            Aucune image associée à ce produit
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
+                                    {(!product.images || product.images.length === 0) && (
+                                        <div className="text-center py-8 border border-dashed rounded-lg">
+                                            <ImageIcon className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                                            <p className="text-sm text-muted-foreground">
+                                                Aucune image associée à ce produit
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
                         )}
 
                         <div className='flex gap-4 w-full'>

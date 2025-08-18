@@ -172,9 +172,9 @@ export const adminProductsColumns: ColumnDef<Product>[] = [
         },
         cell: ({ row }) => {
             const priceCents = row.original.priceCents;
-            const formatted = new Intl.NumberFormat("fr-FR", {
+            const formatted = new Intl.NumberFormat("en-US", {
                 style: "currency",
-                currency: "EUR",
+                currency: "USD",
             }).format(priceCents / 100);
 
             return <div className="font-medium">{formatted}</div>;

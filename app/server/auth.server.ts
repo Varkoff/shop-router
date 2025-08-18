@@ -1,14 +1,23 @@
+import {
+	checkout,
+	polar,
+	portal,
+	usage,
+	webhooks,
+} from "@polar-sh/better-auth";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { admin } from "better-auth/plugins";
 import { redirect } from "react-router";
 // If your Prisma file is located elsewhere, you can change the path
 import { PrismaClient } from "~/../generated/prisma/client";
+import { env } from "./env.server";
+import { polar as polarClient } from "./polar.server";
 
 const prisma = new PrismaClient();
 export const auth = betterAuth({
-	baseURL: process.env.BETTER_AUTH_URL,
-	secret: process.env.BETTER_AUTH_SECRET,
+	baseURL: env.BETTER_AUTH_URL,
+	secret: env.BETTER_AUTH_SECRET,
 	emailAndPassword: {
 		enabled: true,
 	},
@@ -19,6 +28,32 @@ export const auth = betterAuth({
 		admin({
 			// defaultRole: "customer",
 			adminRoles: ["administrator", "super_administrator"],
+		}),
+		polar({
+			client: polarClient,
+			createCustomerOnSignUp: true,
+			use: [
+				checkout({
+					// Configure products here if needed
+					// products: [{ productId: "your-product-id", slug: "pro" }],
+					successUrl: "/checkout/success?checkout_id={CHECKOUT_ID}",
+					authenticatedUsersOnly: true,
+				}),
+				portal(),
+				usage(),
+				webhooks({
+					secret: env.POLAR_WEBHOOK_SECRET || "",
+					onCustomerStateChanged: async (payload) => {
+						console.log("Customer state changed:", payload);
+					},
+					onOrderPaid: async (payload) => {
+						console.log("Order paid:", payload);
+					},
+					onPayload: async (payload) => {
+						console.log("Polar webhook received:", payload);
+					},
+				}),
+			],
 		}),
 	],
 });

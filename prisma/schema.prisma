@@ -23,7 +23,7 @@ datasource db {
 // - Commandes (guest possible)
 // - Gestion du stock
 // - Envoi d'emails via Resend (EmailLog pour historique)
-// - Facturation via Stripe (produits/prices/invoices stockés par id)
+// - Facturation via Polar (produits/prices/invoices stockés par id)
 
 /// Enums
 
@@ -73,6 +73,9 @@ model User {
   banReason  String?
   banExpires DateTime?
 
+  // Polar integration
+  polarCustomerId String?
+
   @@map("user")
 }
 
@@ -86,23 +89,23 @@ model Category {
 }
 
 model Product {
-  id              String     @id @default(uuid())
-  name            String
-  slug            String     @unique
-  description     String?
-  content         String?
-  currency        String     @default("EUR")
-  // Price is stored to render UI; Stripe price is authoritative for billing
-  priceCents      Int        @default(0)
-  stock           Int        @default(0)
-  isActive        Boolean    @default(true)
-  stripeProductId String?    @unique
-  stripePriceId   String?    @unique
-  images          Image[]
-  categories      Category[]
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  CartItem        CartItem[]
+  id             String     @id @default(uuid())
+  name           String
+  slug           String     @unique
+  description    String?
+  content        String?
+  currency       String     @default("USD")
+  // Price is stored to render UI; Polar price is authoritative for billing
+  priceCents     Int        @default(0)
+  stock          Int        @default(0)
+  isActive       Boolean    @default(true)
+  polarProductId String?    @unique
+  polarPriceId   String?    @unique
+  images         Image[]
+  categories     Category[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  CartItem       CartItem[]
 
   @@index([slug])
 }
@@ -157,13 +160,13 @@ model Order {
   paymentStatus  PaymentStatus  @default(PENDING)
   deliveryStatus DeliveryStatus @default(PENDING)
 
-  // Stripe fields
-  stripePaymentIntentId String?
-  stripeInvoiceId       String?
-  stripeCheckoutSession String?
+  // Polar fields
+  polarPaymentIntentId String?
+  polarInvoiceId       String?
+  polarCheckoutSession String?
 
   // Business fields
-  currency String @default("EUR")
+  currency String @default("USD")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -181,17 +184,17 @@ model OrderItem {
   quantity        Int     @default(1)
   unitPriceCents  Int
   totalPriceCents Int
-  stripePriceId   String?
+  polarPriceId    String?
 }
 
 model Invoice {
-  id              String    @id @default(uuid())
-  order           Order     @relation(fields: [orderId], references: [id])
-  orderId         String    @unique
-  stripeInvoiceId String    @unique
-  amountCents     Int
-  paidAt          DateTime?
-  createdAt       DateTime  @default(now())
+  id             String    @id @default(uuid())
+  order          Order     @relation(fields: [orderId], references: [id])
+  orderId        String    @unique
+  polarInvoiceId String    @unique
+  amountCents    Int
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
 }
 
 model EmailLog {
@@ -207,8 +210,8 @@ model EmailLog {
 }
 
 /// Notes:
-// - Products have `stripeProductId` and `stripePriceId` so they can be created/linked to Stripe automatically.
-// - Orders store Stripe identifiers (payment intent / invoice) for reconciliation.
+// - Products have `polarProductId` and `polarPriceId` so they can be created/linked to Polar automatically.
+// - Orders store Polar identifiers (payment intent / invoice) for reconciliation.
 // - Guest checkout is supported via `guestEmail` on `Order` and `sessionId` on `Cart`.
 // - Addresses are stored as `Json` to keep schema flexible (street, city, zip, country, etc.).
 

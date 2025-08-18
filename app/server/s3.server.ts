@@ -7,17 +7,18 @@ import {
 	type PutObjectCommandInput,
 	S3Client,
 } from "@aws-sdk/client-s3";
+import { env } from "./env.server";
 
 // Configuration du client S3
 const s3Client = new S3Client({
-	region: process.env.AWS_REGION,
+	region: env.AWS_REGION,
 	credentials: {
-		accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-		secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+		accessKeyId: env.AWS_ACCESS_KEY_ID,
+		secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
 	},
 });
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
+const BUCKET_NAME = env.AWS_S3_BUCKET_NAME;
 
 /**
  * Upload un fichier vers S3 avec accès public
@@ -45,7 +46,7 @@ export const uploadFileToS3 = async ({
 		await s3Client.send(command);
 
 		// Construire l'URL publique du fichier
-		const publicUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
+		const publicUrl = `https://${BUCKET_NAME}.s3.${env.AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
 
 		return {
 			success: true,
@@ -129,7 +130,7 @@ export const listS3Objects = async ({
 			.filter((obj) => obj.Key && obj.Size && obj.Size > 0) // Exclure les dossiers vides
 			.map((obj) => ({
 				key: obj.Key!,
-				url: `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${obj.Key}`,
+				url: `https://${BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com/${obj.Key}`,
 				size: obj.Size!,
 				lastModified: obj.LastModified!,
 				name: obj.Key!.split("/").pop() || obj.Key!,

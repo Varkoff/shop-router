@@ -14,6 +14,7 @@ import "./app.css";
 import { GeneralErrorBoundary } from "./components/error-boundary";
 import { getOptionalUser } from "./server/auth.server";
 import { getUserCart } from "./server/cart.server";
+import { env } from "./server/env.server";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -34,8 +35,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Récupérer le panier utilisateur s'il est connecté
   const userCart = user ? await getUserCart(user.id) : { items: [] };
+  const { POLAR_ORGANIZATION_ID } = env
 
-  return data({ user, userCart });
+  return data({
+    user, userCart, env: {
+      POLAR_ORGANIZATION_ID
+    }
+  });
 }
 
 export function useOptionalUser() {
@@ -52,6 +58,14 @@ export function useUser() {
     throw new Error("User not found")
   }
   return user
+}
+
+export function useEnv() {
+  const data = useRouteLoaderData<typeof loader>("root");
+  if (!data?.env) {
+    throw new Error("Environment variables not found");
+  }
+  return data.env;
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {

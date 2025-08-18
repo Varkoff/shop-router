@@ -1,10 +1,18 @@
 import { Minus, Plus, ShoppingCart, Trash2, X } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useFetcher } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { useCartContext } from '~/contexts/cart-context'
+import { getOptionalUser } from '~/server/auth.server'
+import type { Route } from './+types/cart'
 
-export default function CartRoute() {
+export async function loader({ request }: Route.LoaderArgs) {
+    const user = await getOptionalUser(request);
+    return { user };
+}
+
+export default function CartRoute({ loaderData }: Route.ComponentProps) {
+    const { user } = loaderData;
     const {
         cart,
         removeFromCart,
@@ -12,7 +20,30 @@ export default function CartRoute() {
         clearCart,
         getTotalPrice,
         getTotalItems
-    } = useCartContext()
+    } = useCartContext();
+
+    const checkoutFetcher = useFetcher();
+
+    const handleCheckout = () => {
+        if (!user) {
+            // Redirect to login if not authenticated
+            window.location.href = `/login?redirectTo=${encodeURIComponent('/cart')}`;
+            return;
+        }
+
+        // Create checkout session for all cart items
+        checkoutFetcher.submit({
+            intent: 'create-checkout',
+            cartItems: JSON.stringify(cart.items.map(item => ({
+                productId: item.product.id,
+                quantity: item.quantity,
+                unitPriceCents: item.product.priceCents
+            })))
+        }, {
+            method: 'POST',
+            action: '/api/polar/checkout'
+        });
+    };
 
     if (cart.items.length === 0) {
         return (
@@ -107,7 +138,7 @@ export default function CartRoute() {
                                                 {/* Prix et contrôles quantité */}
                                                 <div className="flex items-center justify-between">
                                                     <div className="text-lg font-medium">
-                                                        {(item.product.priceCents / 100).toLocaleString('fr-FR')}€
+                                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(item.product.priceCents / 100)}
                                                     </div>
 
                                                     {/* Contrôles de quantité */}
@@ -156,7 +187,7 @@ export default function CartRoute() {
                                             <span className="text-gray-600">
                                                 Sous-total ({getTotalItems()} article{getTotalItems() > 1 ? 's' : ''})
                                             </span>
-                                            <span>{(getTotalPrice() / 100).toLocaleString('fr-FR')}€</span>
+                                            <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(getTotalPrice() / 100)}</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-600">Livraison</span>
@@ -167,7 +198,7 @@ export default function CartRoute() {
                                     <div className="border-t pt-4">
                                         <div className="flex justify-between text-lg font-medium">
                                             <span>Total</span>
-                                            <span>{(getTotalPrice() / 100).toLocaleString('fr-FR')}€</span>
+                                            <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(getTotalPrice() / 100)}</span>
                                         </div>
                                     </div>
 
@@ -176,8 +207,13 @@ export default function CartRoute() {
                                         <Button
                                             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-full font-medium"
                                             size="lg"
+                                            onClick={handleCheckout}
+                                            disabled={checkoutFetcher.state === 'submitting'}
                                         >
-                                            Commander maintenant
+                                            {checkoutFetcher.state === 'submitting'
+                                                ? 'Redirection en cours...'
+                                                : 'Commander maintenant'
+                                            }
                                         </Button>
                                         <Link to="/products" className="block">
                                             <Button
