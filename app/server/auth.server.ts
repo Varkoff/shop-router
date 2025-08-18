@@ -168,3 +168,175 @@ export async function requireSuperAdmin(request: Request) {
 
 	return user;
 }
+
+/**
+ * Updates the user's display name
+ *
+ * @param request - The incoming request object
+ * @param newName - The new display name
+ * @returns Success or error response
+ */
+export async function updateUserName(request: Request, newName: string) {
+	try {
+		const session = await auth.api.getSession({
+			headers: request.headers,
+		});
+
+		if (!session?.user) {
+			throw new Error("User not authenticated");
+		}
+
+		const updatedUser = await prisma.user.update({
+			where: { id: session.user.id },
+			data: { name: newName },
+			select: {
+				id: true,
+				email: true,
+				name: true,
+				role: true,
+			},
+		});
+
+		return { success: true, user: updatedUser };
+	} catch (error) {
+		console.error("Error updating user name:", error);
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Failed to update name",
+		};
+	}
+}
+
+/**
+ * Updates the user's password using Better Auth
+ *
+ * @param request - The incoming request object
+ * @param currentPassword - The current password for verification
+ * @param newPassword - The new password
+ * @returns Success or error response
+ */
+export async function updateUserPassword(
+	request: Request,
+	currentPassword: string,
+	newPassword: string,
+) {
+	try {
+		const session = await auth.api.getSession({
+			headers: request.headers,
+		});
+
+		if (!session?.user) {
+			throw new Error("User not authenticated");
+		}
+
+		// Use Better Auth's changePassword method
+		await auth.api.changePassword({
+			body: {
+				currentPassword,
+				newPassword,
+				revokeOtherSessions: false, // Keep other sessions active
+			},
+			headers: request.headers,
+		});
+
+		return { success: true };
+	} catch (error) {
+		console.error("Error updating password:", error);
+		return {
+			success: false,
+			error:
+				error instanceof Error ? error.message : "Failed to update password",
+		};
+	}
+}
+
+/**
+ * Gets the current user's sessions
+ *
+ * @param request - The incoming request object
+ * @returns User sessions or error response
+ */
+export async function getCurrentUserSessions(request: Request) {
+	try {
+		const session = await auth.api.getSession({
+			headers: request.headers,
+		});
+
+		if (!session?.user) {
+			throw new Error("User not authenticated");
+		}
+
+		// Get sessions directly from database for more detailed information
+		const sessions = await prisma.session.findMany({
+			where: { userId: session.user.id },
+			orderBy: { createdAt: "desc" },
+			select: {
+				id: true,
+				token: true,
+				expiresAt: true,
+				createdAt: true,
+				updatedAt: true,
+				ipAddress: true,
+				userAgent: true,
+				impersonatedBy: true,
+			},
+		});
+
+		return { success: true, sessions };
+	} catch (error) {
+		console.error("Error getting user sessions:", error);
+		return {
+			success: false,
+			error: "Failed to get user sessions",
+			sessions: [],
+		};
+	}
+}
+
+/**
+ * Deletes a user's own session
+ *
+ * @param request - The incoming request object
+ * @param sessionId - The session ID to delete
+ * @returns Success or error response
+ */
+export async function deleteCurrentUserSession(
+	request: Request,
+	sessionId: string,
+) {
+	try {
+		const session = await auth.api.getSession({
+			headers: request.headers,
+		});
+
+		if (!session?.user) {
+			throw new Error("User not authenticated");
+		}
+
+		// Verify that the session belongs to the current user
+		const targetSession = await prisma.session.findFirst({
+			where: {
+				id: sessionId,
+				userId: session.user.id,
+			},
+		});
+
+		if (!targetSession) {
+			throw new Error("Session not found or access denied");
+		}
+
+		// Delete the session
+		await prisma.session.delete({
+			where: { id: sessionId },
+		});
+
+		return { success: true };
+	} catch (error) {
+		console.error("Error deleting user session:", error);
+		return {
+			success: false,
+			error:
+				error instanceof Error ? error.message : "Failed to delete session",
+		};
+	}
+}

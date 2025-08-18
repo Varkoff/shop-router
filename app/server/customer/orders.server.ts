@@ -6,13 +6,9 @@ import { prisma } from "~/server/db.server";
 export async function createOrder({
 	cartData,
 	userId,
-	shippingAddress,
-	billingAddress,
 }: {
 	cartData: z.infer<typeof CreateOrderSchema>;
 	userId?: string;
-	shippingAddress?: unknown;
-	billingAddress?: unknown;
 }) {
 	const { items: cartItems, guestEmail } = cartData;
 	// Validation : il faut soit un userId soit un guestEmail
@@ -127,4 +123,88 @@ export async function createOrder({
 	}
 
 	return order;
+}
+
+/**
+ * Récupère toutes les commandes d'un utilisateur
+ */
+export async function getUserOrders(userId: string) {
+	const orders = await prisma.order.findMany({
+		where: {
+			userId,
+		},
+		orderBy: {
+			createdAt: "desc",
+		},
+		include: {
+			items: true,
+		},
+	});
+
+	// Enrichir avec les informations des produits
+	const enrichedOrders = await Promise.all(
+		orders.map(async (order) => {
+			const enrichedItems = await Promise.all(
+				order.items.map(async (item) => {
+					if (!item.productId) {
+						return { ...item, product: null };
+					}
+
+					const product = await prisma.product.findUnique({
+						where: { id: item.productId },
+						include: {
+							images: {
+								take: 1,
+							},
+						},
+					});
+
+					return { ...item, product };
+				}),
+			);
+
+			return { ...order, items: enrichedItems };
+		}),
+	);
+
+	return enrichedOrders;
+}
+
+/**
+ * Récupère une commande spécifique d'un utilisateur
+ */
+export async function getUserOrder(userId: string, orderId: string) {
+	const order = await prisma.order.findUnique({
+		where: {
+			id: orderId,
+			userId,
+		},
+		include: {
+			items: true,
+		},
+	});
+
+	if (!order) {
+		return null;
+	}
+
+	// Enrichir avec les informations des produits
+	const enrichedItems = await Promise.all(
+		order.items.map(async (item) => {
+			if (!item.productId) {
+				return { ...item, product: null };
+			}
+
+			const product = await prisma.product.findUnique({
+				where: { id: item.productId },
+				include: {
+					images: true,
+				},
+			});
+
+			return { ...item, product };
+		}),
+	);
+
+	return { ...order, items: enrichedItems };
 }

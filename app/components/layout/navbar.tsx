@@ -1,4 +1,4 @@
-import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { ChevronDown, Minus, Plus, ShoppingCart, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { ClientOnly } from 'remix-utils/client-only';
@@ -6,6 +6,7 @@ import { useCartContext } from '~/contexts/cart-context';
 import { signOut } from '~/lib/auth-client';
 import { useOptionalUser } from '~/root';
 import { Button, buttonVariants } from '../ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../ui/hover-card';
 import { Separator } from '../ui/separator';
 
@@ -58,10 +59,9 @@ export function Navbar() {
                     </div>
 
                     {/* Right Side Actions */}
-                    <div className='flex items-center space-x-4'>
+                    <div className='hidden md:flex items-center space-x-4'>
                         <ClientOnly>
                             {() =>
-
                                 <HoverCard openDelay={100} closeDelay={200}>
                                     <HoverCardTrigger asChild>
                                         <Link
@@ -160,37 +160,49 @@ export function Navbar() {
                                 </HoverCard>}
                         </ClientOnly>
 
-                    </div>
-
-                    {/* Auth Buttons */}
-                    <div className='hidden md:flex items-center space-x-3'>
                         {user ? (
-                            <>
-                                <span className='text-gray-600 font-light'>
-                                    Bonjour, {user.name}
-                                </span>
-                                <Link
-                                    to='/admin'
-                                    className={buttonVariants({
-                                        size: 'sm',
-                                        variant: 'outline',
-                                        className: 'font-light',
-                                    })}
-                                >
-                                    Dashboard
-                                </Link>
-                                <button
-                                    type='button'
-                                    onClick={handleSignOut}
-                                    className={buttonVariants({
-                                        size: 'sm',
-                                        variant: 'ghost',
-                                        className: 'text-gray-600 hover:text-red-600 font-light',
-                                    })}
-                                >
-                                    Déconnexion
-                                </button>
-                            </>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex items-center space-x-2 text-gray-600 hover:text-black font-light"
+                                    >
+                                        <User className="w-4 h-4" />
+                                        <span>Bonjour, {user.name}</span>
+                                        <ChevronDown className="w-4 h-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    {(user.role === 'administrator' || user.role === 'super_administrator') ? (
+                                        <DropdownMenuItem asChild>
+                                            <Link to="/admin" className="w-full">
+                                                Dashboard administrateur
+                                            </Link>
+                                        </DropdownMenuItem>
+                                    ) : (
+                                        <>
+                                            <DropdownMenuItem asChild>
+                                                <Link to="/profile" className="w-full">
+                                                    Mon profil
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                                <Link to="/orders" className="w-full">
+                                                    Mes commandes
+                                                </Link>
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={handleSignOut}
+                                        className="text-red-600 hover:text-red-700 focus:text-red-700"
+                                    >
+                                        Déconnexion
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         ) : (
                             <>
                                 <Link
@@ -298,7 +310,7 @@ export function Navbar() {
                             </Link>
                         </div>
 
-                        {/* Mobile Auth Buttons */}
+                        {/* Mobile Auth Section */}
                         <div className='space-y-4 pt-8 border-t border-gray-200'>
                             {user ? (
                                 <>
@@ -307,17 +319,46 @@ export function Navbar() {
                                             Bonjour, {user.name}
                                         </span>
                                     </div>
-                                    <Link
-                                        to='/admin'
-                                        className={buttonVariants({
-                                            size: 'lg',
-                                            variant: 'outline',
-                                            className: 'w-full justify-center text-xl font-light py-4',
-                                        })}
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        Dashboard
-                                    </Link>
+
+                                    {(user.role === 'administrator' || user.role === 'super_administrator') ? (
+                                        <Link
+                                            to='/admin'
+                                            className={buttonVariants({
+                                                size: 'lg',
+                                                variant: 'outline',
+                                                className: 'w-full justify-center text-xl font-light py-4',
+                                            })}
+                                            onClick={() => setIsMobileMenuOpen(false)}
+                                        >
+                                            Dashboard administrateur
+                                        </Link>
+                                    ) : (
+                                        <>
+                                            <Link
+                                                to='/profile'
+                                                className={buttonVariants({
+                                                    size: 'lg',
+                                                    variant: 'outline',
+                                                    className: 'w-full justify-center text-xl font-light py-4',
+                                                })}
+                                                onClick={() => setIsMobileMenuOpen(false)}
+                                            >
+                                                Mon profil
+                                            </Link>
+                                            <Link
+                                                to='/orders'
+                                                className={buttonVariants({
+                                                    size: 'lg',
+                                                    variant: 'outline',
+                                                    className: 'w-full justify-center text-xl font-light py-4',
+                                                })}
+                                                onClick={() => setIsMobileMenuOpen(false)}
+                                            >
+                                                Mes commandes
+                                            </Link>
+                                        </>
+                                    )}
+
                                     <button
                                         type='button'
                                         onClick={() => {
