@@ -1,7 +1,7 @@
 import { getFormProps, getInputProps, useForm } from "@conform-to/react";
 import { getZodConstraint, parseWithZod } from "@conform-to/zod";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { DollarSign, ExternalLink, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useFetcher } from "react-router";
 import {
@@ -17,6 +17,13 @@ import {
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { DataTableColumnHeader } from "~/components/ui/data-table-column-header";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import { Switch } from "~/components/ui/switch";
 import type { adminGetProducts } from "~/server/admin/admin-products.server";
 import { ToggleStatusSchema } from "./products.index";
@@ -60,26 +67,65 @@ const ProductStatusToggle = ({ product }: { product: Product }) => {
     );
 };
 
-const ProductDeleteButton = ({ product }: { product: Product }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const fetcher = useFetcher();
-    const isDeleting = fetcher.state === "submitting";
+const ProductActionsDropdown = ({ product }: { product: Product }) => {
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const deleteFetcher = useFetcher();
+    const syncFetcher = useFetcher();
+    const isDeleting = deleteFetcher.state === "submitting";
+    const isSyncing = syncFetcher.state === "submitting";
 
     return (
         <>
-            <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                    setIsOpen(true);
-                }}
-                disabled={isDeleting}
-            >
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Supprimer</span>
-            </Button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-3.5 w-3.5" />
+                        <span className="sr-only">Ouvrir le menu</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem asChild>
+                        <Link to={`/admin/products/${product.slug}`} className="flex items-center">
+                            <Pencil className="h-3.5 w-3.5 mr-2" />
+                            Modifier
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link to={`/products/${product.slug}`} target="_blank" className="flex items-center">
+                            <ExternalLink className="h-3.5 w-3.5 mr-2" />
+                            Voir la page
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onClick={() => {
+                            const formData = new FormData();
+                            formData.set("intent", "sync-stripe");
+                            formData.set("productId", product.id);
+                            syncFetcher.submit(formData, {
+                                method: "POST",
+                                action: `/admin/products/${product.slug}`
+                            });
+                        }}
+                        disabled={isSyncing}
+                        className="flex items-center"
+                    >
+                        <DollarSign className="h-3.5 w-3.5 mr-2" />
+                        {isSyncing ? "Synchronisation..." : "Sync avec Stripe"}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onClick={() => setIsDeleteOpen(true)}
+                        className="flex items-center text-destructive focus:text-destructive"
+                        disabled={isDeleting}
+                    >
+                        <Trash2 className="h-3.5 w-3.5 mr-2" />
+                        Supprimer
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
 
-            <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+            <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Supprimer le produit</AlertDialogTitle>
@@ -95,8 +141,8 @@ const ProductDeleteButton = ({ product }: { product: Product }) => {
                                 const formData = new FormData();
                                 formData.set("intent", "delete-product");
                                 formData.set("productSlug", product.slug);
-                                fetcher.submit(formData, { method: "POST" });
-                                setIsOpen(false);
+                                deleteFetcher.submit(formData, { method: "POST" });
+                                setIsDeleteOpen(false);
                             }}
                             disabled={isDeleting}
                         >
@@ -224,23 +270,7 @@ export const adminProductsColumns: ColumnDef<Product>[] = [
         header: "Actions",
         cell: ({ row }) => {
             const product = row.original;
-            return (
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/admin/products/${product.slug}`}>
-                            <Pencil className="h-4 w-4" />
-                            <span className="sr-only">Modifier</span>
-                        </Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/products/${product.slug}`} target="_blank">
-                            <ExternalLink className="h-4 w-4" />
-                            <span className="sr-only">Voir</span>
-                        </Link>
-                    </Button>
-                    <ProductDeleteButton product={product} />
-                </div>
-            );
+            return <ProductActionsDropdown product={product} />;
         },
     },
 ];
