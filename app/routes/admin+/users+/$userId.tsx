@@ -9,7 +9,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
-import { Separator } from "~/components/ui/separator";
+
 // import { Textarea } from "~/components/ui/textarea"; // COMMENTED OUT - not needed without ban feature
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
 import { /* banUser, */ deleteAllUserSessions, deleteUserSession, getUser, getUserSessions, removeUser, setUserRole, /* unbanUser, */ updateUser, verifyUserEmail } from "~/server/admin/admin-users.server";
@@ -695,55 +695,93 @@ export default function UserEditPage({ loaderData }: Route.ComponentProps) {
 
     if (!user) {
         return (
-            <div className="text-center py-8">
-                <p className="text-muted-foreground">Utilisateur non trouvé</p>
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <h2 className="text-2xl font-semibold text-muted-foreground mb-2">
+                        Utilisateur non trouvé
+                    </h2>
+                    <p className="text-muted-foreground">
+                        L'utilisateur demandé n'existe pas ou a été supprimé.
+                    </p>
+                </div>
             </div>
         );
     }
 
+    const canManageUser = currentUser.role === "super_administrator" ||
+        (currentUser.role === "administrator" && user.role === "customer");
+
+    const showActions = canManageUser && user.id !== currentUser.id;
+
     return (
-        <div className="space-y-6">
-            {/* Informations utilisateur */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold">{user.name}</h3>
-                    <Badge variant={user.emailVerified ? "default" : "secondary"}>
-                        {user.emailVerified ? "Vérifié" : "Non vérifié"}
-                    </Badge>
+        <div className="min-h-screen bg-muted/20">
+            <div className="container mx-auto py-8 space-y-6">
+                {/* Header avec informations principales */}
+                <div className="bg-background border rounded-lg p-6">
+                    <div className="flex items-start justify-between">
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-3xl font-bold">{user.name}</h1>
+                                <Badge variant={user.emailVerified ? "default" : "secondary"} className="text-sm">
+                                    {user.emailVerified ? "Email vérifié" : "Email non vérifié"}
+                                </Badge>
+                                {user.id === currentUser.id && (
+                                    <Badge variant="outline" className="text-sm border-blue-200 text-blue-700">
+                                        Vous
+                                    </Badge>
+                                )}
+                            </div>
+                            <p className="text-lg text-muted-foreground">{user.email}</p>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <span>Créé le {new Date(user.createdAt).toLocaleDateString("fr-FR")}</span>
+                                <span>•</span>
+                                <span>ID: {user.id}</span>
+                            </div>
+                        </div>
+
+                        <div className="text-right">
+                            <Badge
+                                variant={
+                                    user.role === "super_administrator" ? "destructive" :
+                                        user.role === "administrator" ? "default" : "secondary"
+                                }
+                                className="text-base px-3 py-1"
+                            >
+                                {user.role === "super_administrator" ? "Super Administrateur" :
+                                    user.role === "administrator" ? "Administrateur" : "Client"}
+                            </Badge>
+                        </div>
+                    </div>
                 </div>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
-                <p className="text-xs text-muted-foreground">
-                    Créé le {new Date(user.createdAt).toLocaleString("fr-FR")}
-                </p>
-            </div>
 
-            <Separator />
+                <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Informations personnelles */}
+                    <div className="bg-background border rounded-lg p-6">
+                        <h2 className="text-xl font-semibold mb-4">Informations personnelles</h2>
+                        <UserEditForm user={user} />
+                    </div>
 
-            {/* Formulaire d'édition */}
-            <div className="space-y-4">
-                <h4 className="font-medium">Informations générales</h4>
-                <UserEditForm user={user} />
-            </div>
+                    {/* Gestion du rôle */}
+                    {canManageUser && user.id !== currentUser.id && (
+                        <div className="bg-background border rounded-lg p-6">
+                            <h2 className="text-xl font-semibold mb-4">Gestion du rôle</h2>
+                            <UserRoleForm user={user} currentUser={currentUser} />
+                        </div>
+                    )}
 
-            <Separator />
+                    {/* Actions administratives */}
+                    {showActions && (
+                        <div className="bg-background border rounded-lg p-6">
+                            <h2 className="text-xl font-semibold mb-4">Actions administratives</h2>
+                            <UserActionsSection user={user} currentUser={currentUser} />
+                        </div>
+                    )}
+                </div>
 
-            {/* Gestion du rôle */}
-            <div className="space-y-4">
-                <h4 className="font-medium">Rôle</h4>
-                <UserRoleForm user={user} currentUser={currentUser} />
-            </div>
-
-            <Separator />
-
-            {/* Sessions */}
-            <UserSessionsSection sessions={sessions} userId={user.id} currentUser={currentUser} />
-
-            <Separator />
-
-            {/* Actions */}
-            <div className="space-y-4">
-                <h4 className="font-medium">Actions</h4>
-                <UserActionsSection user={user} currentUser={currentUser} />
+                {/* Sessions - section complète en bas */}
+                <div className="bg-background border rounded-lg p-6">
+                    <UserSessionsSection sessions={sessions} userId={user.id} currentUser={currentUser} />
+                </div>
             </div>
         </div>
     );

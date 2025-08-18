@@ -68,10 +68,84 @@ export async function getAllUsersWithRoles() {
 				banned: true,
 				banReason: true,
 				banExpires: true,
+				stripeCustomerId: true,
+				// Include customer-specific data
+				orders: {
+					select: {
+						id: true,
+						totalCents: true,
+						orderStatus: true,
+						paymentStatus: true,
+						createdAt: true,
+					},
+					orderBy: { createdAt: "desc" },
+				},
+				cart: {
+					select: {
+						id: true,
+						updatedAt: true,
+						items: {
+							select: {
+								id: true,
+								quantity: true,
+								unitPriceCents: true,
+							},
+						},
+					},
+				},
+				sessions: {
+					select: {
+						id: true,
+						expiresAt: true,
+						createdAt: true,
+						updatedAt: true,
+					},
+					orderBy: { updatedAt: "desc" },
+					take: 1, // Get most recent session for last login
+				},
 			},
 			orderBy: { createdAt: "desc" },
 		});
-		return { success: true, users };
+
+		// Calculate derived customer metrics
+		const usersWithMetrics = users.map((user) => {
+			const now = new Date();
+			const activeSessions = user.sessions.filter(
+				(session) => session.expiresAt > now,
+			);
+			const lastSession = user.sessions[0];
+			const totalOrderValue = user.orders.reduce(
+				(sum, order) => sum + order.totalCents,
+				0,
+			);
+			const paidOrders = user.orders.filter(
+				(order) => order.paymentStatus === "PAID",
+			);
+			const cartItemsCount =
+				user.cart?.items.reduce((sum, item) => sum + item.quantity, 0) || 0;
+			const cartValue =
+				user.cart?.items.reduce(
+					(sum, item) => sum + item.quantity * item.unitPriceCents,
+					0,
+				) || 0;
+
+			return {
+				...user,
+				customerMetrics: {
+					ordersCount: user.orders.length,
+					paidOrdersCount: paidOrders.length,
+					totalOrderValueCents: totalOrderValue,
+					hasActiveCart: !!user.cart && cartItemsCount > 0,
+					cartItemsCount,
+					cartValueCents: cartValue,
+					hasStripeCustomer: !!user.stripeCustomerId,
+					activeSessionsCount: activeSessions.length,
+					lastLoginAt: lastSession?.updatedAt || null,
+				},
+			};
+		});
+
+		return { success: true, users: usersWithMetrics };
 	} catch (error) {
 		console.error("Error listing users:", error);
 		return { success: false, error: "Failed to list users" };
