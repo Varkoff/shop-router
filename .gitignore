@@ -5,5 +5,4 @@
 /.react-router/
 /build/
 
-/generated/prisma
 .env
