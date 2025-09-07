@@ -22,6 +22,6 @@ services:
     image: algomax/shop-router:production
     restart: always
     ports:
-      - '3000:3000'
+      - '3011:3000'
     # volumes:
     #   - ./image-cache:/app/image-cache
