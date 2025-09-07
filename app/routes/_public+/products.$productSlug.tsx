@@ -24,7 +24,7 @@ export async function loader({ params }: Route.LoaderArgs) {
         )
     }
 
-    return data({ product: productData.product, productImages: productData.productImages });
+    return data({ product: productData.product, productImages: productData.productImages, FRONTEND_URL: serverEnv.FRONTEND_URL });
 }
 
 export function meta({ loaderData, location }: Route.MetaArgs) {
@@ -36,7 +36,7 @@ export function meta({ loaderData, location }: Route.MetaArgs) {
     }
 
     const { product, productImages } = loaderData;
-    const baseUrl = serverEnv.FRONTEND_URL; // Replace with your actual domain
+    const baseUrl = loaderData.FRONTEND_URL; // Replace with your actual domain
 
     return generateMeta({
         title: product.name,
