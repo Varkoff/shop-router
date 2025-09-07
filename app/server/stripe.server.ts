@@ -3,12 +3,13 @@ import { adminGetProduct } from "./admin/admin-products.server";
 import type { getOptionalUser } from "./auth.server";
 import type { createOrder } from "./customer/orders.server";
 import { prisma } from "./db.server";
+import { serverEnv } from "./env.server";
 
-if (!process.env.STRIPE_SECRET_KEY) {
+if (!serverEnv.STRIPE_SECRET_KEY) {
 	throw new Error("STRIPE_SECRET_KEY environment variable is required");
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+export const stripe = new Stripe(serverEnv.STRIPE_SECRET_KEY, {
 	apiVersion: "2025-07-30.basil",
 });
 

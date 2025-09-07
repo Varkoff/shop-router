@@ -1,0 +1,65 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: ['main', 'dev']
+  pull_request:
+    branches: ['main', 'dev']
+
+jobs:
+  build:
+    name: 🐳 build
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: npm install
+      - name: Run typechecking
+        run: npm run typecheck
+  deploy:
+    name: 🚀 Deploy
+    runs-on: [self-hosted]
+    needs: [build, typecheck]
+    # only build/deploy main branch on pushes
+    if: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name == 'push' }}
+    env:
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_SENDER: ${{ secrets.SMTP_SENDER }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+    steps:
+      - name: 🛑 Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🚀 Run Docker Compose on Staging
+        if: ${{ github.ref == 'refs/heads/dev' }}
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL_STAGING }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
+        run: |
+          docker pull algomax/shop-router:latest
+          docker compose -f docker-compose.staging.yml up -d
+          docker system prune --all --volumes --force
+
+      - name: 🚀 Run Docker Compose on Production
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          docker pull algomax/shop-router:production
+          docker compose -f docker-compose.prod.yml up -d
+          docker system prune --all --volumes --force

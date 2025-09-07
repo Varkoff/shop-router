@@ -1,0 +1,26 @@
+services:
+  shop_router_dev:
+    environment:
+      - DATABASE_URL
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_REGION
+      - AWS_S3_BUCKET_NAME
+      - BETTER_AUTH_SECRET
+      - BETTER_AUTH_URL
+      - STRIPE_WEBHOOK_SECRET
+      - STRIPE_PUBLISHABLE_KEY
+      - STRIPE_SECRET_KEY
+      - RESEND_API_KEY
+      - RESEND_FROM_EMAIL
+      - FRONTEND_URL
+    container_name: shop_router_dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # image: algomax/react-router-7:production
+    restart: always
+    ports:
+      - '3000:3000'
+    # volumes:
+    #   - ./image-cache:/app/image-cache
