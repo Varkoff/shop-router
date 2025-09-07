@@ -2,6 +2,7 @@ import type { Prisma } from "generated/prisma/client";
 import type z from "zod";
 import type { CreateOrderSchema } from "~/routes/_public+/cart";
 import { prisma } from "~/server/db.server";
+import { sendOrderConfirmationEmail } from "~/server/emails.server";
 
 export async function createOrder({
 	cartData,
@@ -84,8 +85,6 @@ export async function createOrder({
 		data: {
 			userId,
 			guestEmail,
-			// shippingAddress,
-			// billingAddress,
 			subtotalCents,
 			taxCents,
 			shippingCents,
@@ -120,6 +119,38 @@ export async function createOrder({
 				},
 			},
 		});
+	}
+
+	// Envoyer l'email de confirmation de commande
+	try {
+		const customerEmail = order.user?.email || guestEmail;
+		const customerName = order.user?.name || "Client";
+
+		if (customerEmail) {
+			await sendOrderConfirmationEmail({
+				orderId: order.id,
+				customerName,
+				customerEmail,
+				orderItems: order.items.map((item) => ({
+					productName: item.productName,
+					quantity: item.quantity,
+					unitPriceCents: item.unitPriceCents,
+					totalPriceCents: item.totalPriceCents,
+				})),
+				subtotalCents: order.subtotalCents,
+				taxCents: order.taxCents,
+				shippingCents: order.shippingCents,
+				totalCents: order.totalCents,
+				currency: order.currency,
+				orderDate: order.createdAt,
+			});
+		}
+	} catch (emailError) {
+		// Ne pas faire échouer la création de commande si l'email échoue
+		console.error(
+			"Erreur lors de l'envoi de l'email de confirmation:",
+			emailError,
+		);
 	}
 
 	return order;

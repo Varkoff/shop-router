@@ -4,6 +4,10 @@ import { admin } from "better-auth/plugins";
 import { redirect } from "react-router";
 // If your Prisma file is located elsewhere, you can change the path
 import { PrismaClient } from "~/../generated/prisma/client";
+import {
+	sendAccountCreatedEmail,
+	sendPasswordResetEmail,
+} from "~/server/emails.server";
 
 const prisma = new PrismaClient();
 export const auth = betterAuth({
@@ -15,6 +19,17 @@ export const auth = betterAuth({
 	database: prismaAdapter(prisma, {
 		provider: "postgresql",
 	}),
+
+	emailVerification: {
+		sendOnSignUp: true,
+		async sendVerificationEmail(data) {
+			await sendAccountCreatedForUser(
+				data.user.email,
+				data.user.name,
+				// data.token,
+			);
+		},
+	},
 	plugins: [
 		admin({
 			// defaultRole: "customer",
@@ -339,4 +354,44 @@ export async function deleteCurrentUserSession(
 				error instanceof Error ? error.message : "Failed to delete session",
 		};
 	}
+}
+
+/**
+ * Sends a password reset email using Resend templates
+ */
+export async function sendPasswordResetForUser(
+	email: string,
+	resetToken: string,
+	name?: string,
+) {
+	const baseUrl = process.env.FRONTEND_URL || process.env.BETTER_AUTH_URL || "";
+	const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(email)}`;
+
+	await sendPasswordResetEmail({
+		email,
+		name,
+		resetUrl,
+	});
+}
+
+/**
+ * Sends an account created/welcome email, with optional verify link
+ */
+export async function sendAccountCreatedForUser(
+	email: string,
+	name?: string,
+	verifyToken?: string,
+) {
+	const baseUrl = process.env.FRONTEND_URL || process.env.BETTER_AUTH_URL || "";
+	const loginUrl = `${baseUrl}/login`;
+	const verifyUrl = verifyToken
+		? `${baseUrl}/verify-email?token=${encodeURIComponent(verifyToken)}&email=${encodeURIComponent(email)}`
+		: undefined;
+
+	await sendAccountCreatedEmail({
+		email,
+		name,
+		loginUrl,
+		verifyUrl,
+	});
 }
