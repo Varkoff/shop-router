@@ -1,15 +1,16 @@
 import type Stripe from "stripe";
 import { prisma } from "~/server/db.server";
+import { serverEnv } from "~/server/env.server";
 import { stripe } from "~/server/stripe.server";
 import type { Route } from "./+types/api.stripe.webhooks";
 
 export async function action({ request }: Route.ActionArgs) {
 	// Votre endpoint secret de webhook depuis Stripe Dashboard
-	const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+	const WEBHOOK_SECRET = serverEnv.STRIPE_WEBHOOK_SECRET;
 
-	if (!WEBHOOK_SECRET) {
-		throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required");
-	}
+	// if (!WEBHOOK_SECRET) {
+	// 	throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required");
+	// }
 	const payload = await request.text();
 	const signature = request.headers.get("stripe-signature");
 

@@ -8,11 +8,12 @@ import {
 	sendAccountCreatedEmail,
 	sendPasswordResetEmail,
 } from "~/server/emails.server";
+import { serverEnv } from "./env.server";
 
 const prisma = new PrismaClient();
 export const auth = betterAuth({
-	baseURL: process.env.BETTER_AUTH_URL,
-	secret: process.env.BETTER_AUTH_SECRET,
+	baseURL: serverEnv.BETTER_AUTH_URL,
+	secret: serverEnv.BETTER_AUTH_SECRET,
 	emailAndPassword: {
 		enabled: true,
 	},
@@ -364,7 +365,7 @@ export async function sendPasswordResetForUser(
 	resetToken: string,
 	name?: string,
 ) {
-	const baseUrl = process.env.FRONTEND_URL || process.env.BETTER_AUTH_URL || "";
+	const baseUrl = serverEnv.FRONTEND_URL || "";
 	const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(email)}`;
 
 	await sendPasswordResetEmail({
@@ -382,7 +383,7 @@ export async function sendAccountCreatedForUser(
 	name?: string,
 	verifyToken?: string,
 ) {
-	const baseUrl = process.env.FRONTEND_URL || process.env.BETTER_AUTH_URL || "";
+	const baseUrl = serverEnv.FRONTEND_URL || "";
 	const loginUrl = `${baseUrl}/login`;
 	const verifyUrl = verifyToken
 		? `${baseUrl}/verify-email?token=${encodeURIComponent(verifyToken)}&email=${encodeURIComponent(email)}`

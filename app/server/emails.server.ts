@@ -1,7 +1,8 @@
 import { Resend } from "resend";
+import { serverEnv } from "./env.server";
 
 // Initialiser Resend avec la clé API
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(serverEnv.RESEND_API_KEY);
 
 interface OrderEmailData {
 	orderId: string;
@@ -200,7 +201,7 @@ const orderConfirmationTemplate = (data: OrderEmailData) => `
         </div>
 
         <div style="text-align: center;">
-            <a href="${process.env.FRONTEND_URL}/orders/${data.orderId}" class="cta-button">
+            <a href="${serverEnv.FRONTEND_URL}/orders/${data.orderId}" class="cta-button">
                 Suivre ma commande
             </a>
         </div>
@@ -239,7 +240,7 @@ ${data.shippingCents > 0 ? `Frais de livraison : ${formatPrice(data.shippingCent
 ${data.taxCents > 0 ? `Taxes : ${formatPrice(data.taxCents, data.currency)}\n` : ""}
 Total : ${formatPrice(data.totalCents, data.currency)}
 
-Vous pouvez suivre votre commande à l'adresse : ${process.env.FRONTEND_URL}/orders/${data.orderId}
+Vous pouvez suivre votre commande à l'adresse : ${serverEnv.FRONTEND_URL}/orders/${data.orderId}
 
 Merci de votre confiance !
 `;
@@ -257,7 +258,7 @@ const formatPrice = (priceCents: number, currency: string) => {
 export async function sendOrderConfirmationEmail(data: OrderEmailData) {
 	try {
 		const result = await resend.emails.send({
-			from: process.env.RESEND_FROM_EMAIL || "noreply@yourdomain.com",
+			from: serverEnv.RESEND_FROM_EMAIL,
 			to: data.customerEmail,
 			subject: `Confirmation de commande #${data.orderId}`,
 			html: orderConfirmationTemplate(data),
@@ -336,7 +337,7 @@ const orderStatusUpdateTemplate = (
         </div>
 
         <div style="text-align: center;">
-            <a href="${process.env.FRONTEND_URL}/orders/${data.orderId}" class="cta-button">
+            <a href="${serverEnv.FRONTEND_URL}/orders/${data.orderId}" class="cta-button">
                 Voir ma commande
             </a>
         </div>
@@ -351,7 +352,7 @@ export async function sendOrderStatusUpdateEmail(
 ) {
 	try {
 		const result = await resend.emails.send({
-			from: process.env.RESEND_FROM_EMAIL || "noreply@yourdomain.com",
+			from: serverEnv.RESEND_FROM_EMAIL,
 			to: data.customerEmail,
 			subject: `Mise à jour de votre commande #${data.orderId}`,
 			html: orderStatusUpdateTemplate(data),
@@ -426,7 +427,7 @@ Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.
 export async function sendPasswordResetEmail(data: PasswordResetEmailData) {
 	try {
 		const result = await resend.emails.send({
-			from: process.env.RESEND_FROM_EMAIL || "noreply@yourdomain.com",
+			from: serverEnv.RESEND_FROM_EMAIL,
 			to: data.email,
 			subject: "Réinitialisation de votre mot de passe",
 			html: passwordResetTemplate(data),
@@ -494,7 +495,7 @@ ${data.verifyUrl ? `Confirmez votre email: ${data.verifyUrl}` : `Connectez-vous:
 export async function sendAccountCreatedEmail(data: AccountCreatedEmailData) {
 	try {
 		const result = await resend.emails.send({
-			from: process.env.RESEND_FROM_EMAIL || "noreply@yourdomain.com",
+			from: serverEnv.RESEND_FROM_EMAIL,
 			to: data.email,
 			subject: "Bienvenue — Votre compte est prêt",
 			html: accountCreatedTemplate(data),
