@@ -1,6 +1,6 @@
 services:
   shop_router_production:
-    # platform: linux/amd64
+    platform: linux/amd64
     environment:
       - DATABASE_URL
       - AWS_ACCESS_KEY_ID
