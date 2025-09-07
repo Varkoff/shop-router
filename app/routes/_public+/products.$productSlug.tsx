@@ -10,6 +10,7 @@ import { Card } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { useCartContext } from "~/contexts/cart-context";
 import { getProduct } from "~/server/customer/products.server";
+import { serverEnv } from "~/server/env.server";
 import type { Route } from "./+types/products.$productSlug";
 export async function loader({ params }: Route.LoaderArgs) {
     const productData = await getProduct({
@@ -35,7 +36,7 @@ export function meta({ loaderData, location }: Route.MetaArgs) {
     }
 
     const { product, productImages } = loaderData;
-    const baseUrl = "https://localhost:5173"; // Replace with your actual domain
+    const baseUrl = serverEnv.FRONTEND_URL; // Replace with your actual domain
 
     return generateMeta({
         title: product.name,
